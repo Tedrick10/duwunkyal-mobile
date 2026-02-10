@@ -50,6 +50,7 @@ Preferred communication style: Simple, everyday language.
   - `categories` — id, name, image, createdAt
   - `products` — id, name, description, price, image, categoryId (FK→categories), sizes, colors, stock, featured, createdAt
   - `cartItems` — id, userId (FK→users), productId, quantity, size, color
+  - `wishlistItems` — id, userId (FK→users), productId (FK→products), createdAt
   - `orders` — id, userId, status, total, shippingAddress, timestamps
   - `orderItems` — id, orderId, productId, quantity, price, size, color
 - **Validation**: `drizzle-zod` generates Zod schemas from Drizzle tables for insert validation
