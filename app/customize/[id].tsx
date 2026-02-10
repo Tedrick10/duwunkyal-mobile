@@ -7,6 +7,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { WebView } from "react-native-webview";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 
@@ -14,6 +15,7 @@ export default function CustomizeScreen() {
   const { id } = useLocalSearchParams();
   const webViewRef = useRef<WebView>(null);
   const hasNavigatedBack = useRef(false);
+  const insets = useSafeAreaInsets();
 
   const baseUrl = getApiUrl();
   const customizeUrl = `${baseUrl.replace(/\/$/, "")}/customize/${id}`;
@@ -69,19 +71,17 @@ export default function CustomizeScreen() {
     );
   }
 
+  const topInset = insets.top;
+
   const earlyInjectedJS = `
-    window._goBackToApp = function() {
-      try { window.ReactNativeWebView.postMessage('GO_BACK'); } catch(e) {}
-      setTimeout(function() {
-        try { window.location.href = 'stylevault://back'; } catch(e) {}
-      }, 200);
-    };
+    document.documentElement.style.setProperty('--custom-top-inset', '${topInset}px');
     true;
   `;
 
   const injectedJS = `
     (function() {
-      var origGoBack = window.goBack;
+      document.documentElement.style.setProperty('--custom-top-inset', '${topInset}px');
+
       window.goBack = function() {
         try { window.ReactNativeWebView.postMessage('GO_BACK'); } catch(e) {}
         setTimeout(function() {
@@ -90,12 +90,17 @@ export default function CustomizeScreen() {
       };
       var btn = document.querySelector('.back-btn');
       if (btn) {
-        btn.removeAttribute('onclick');
-        btn.addEventListener('click', function(e) {
+        var newBtn = btn.cloneNode(true);
+        newBtn.removeAttribute('onclick');
+        newBtn.addEventListener('click', function(e) {
           e.preventDefault();
           e.stopPropagation();
-          window.goBack();
-        });
+          try { window.ReactNativeWebView.postMessage('GO_BACK'); } catch(ex) {}
+          setTimeout(function() {
+            try { window.location.href = 'stylevault://back'; } catch(ex) {}
+          }, 200);
+        }, true);
+        btn.parentNode.replaceChild(newBtn, btn);
       }
     })();
     true;
