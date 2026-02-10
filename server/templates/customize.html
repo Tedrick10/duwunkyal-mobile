@@ -397,7 +397,7 @@
 <body>
   <div class="top-bar">
     <div class="top-bar-left">
-      <button class="back-btn" onclick="window.history.back()">
+      <button class="back-btn" onclick="goBack()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         <span class="back-label">Back</span>
       </button>
@@ -1068,6 +1068,16 @@
         else window.undo();
       }
     });
+
+    window.goBack = function() {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage('GO_BACK');
+      } else if (window.parent !== window) {
+        window.parent.postMessage('GO_BACK', '*');
+      } else {
+        window.history.back();
+      }
+    };
 
     undoStack.push(JSON.stringify(fabricCanvas.toJSON()));
 

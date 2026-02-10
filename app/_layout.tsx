@@ -45,6 +45,10 @@ function RootLayoutNav() {
         name="wishlist"
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="customize/[id]"
+        options={{ headerShown: false }}
+      />
     </Stack>
   );
 }
