@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Switch,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -15,11 +16,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const { user, logout } = useAuth();
+  const { isDark, toggleTheme, colors: C } = useTheme();
 
   const { data: orders, isLoading: loadingOrders } = useQuery<any[]>({
     queryKey: ["/api/orders"],
@@ -28,16 +31,16 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
+      <View style={[styles.container, { paddingTop: insets.top + webTopInset, backgroundColor: C.background }]}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={[styles.headerTitle, { color: C.text }]}>Profile</Text>
         </View>
         <View style={styles.center}>
-          <View style={styles.avatarPlaceholder}>
-            <Ionicons name="person-outline" size={40} color={Colors.textLight} />
+          <View style={[styles.avatarPlaceholder, { backgroundColor: C.surfaceSecondary }]}>
+            <Ionicons name="person-outline" size={40} color={C.textLight} />
           </View>
-          <Text style={styles.emptyTitle}>Sign in to your account</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={[styles.emptyTitle, { color: C.text }]}>Sign in to your account</Text>
+          <Text style={[styles.emptySubtitle, { color: C.textSecondary }]}>
             Track orders, save favorites, and more
           </Text>
           <Pressable
@@ -49,6 +52,23 @@ export default function ProfileScreen() {
           <Pressable onPress={() => router.push("/(auth)/register")}>
             <Text style={styles.registerLink}>Create Account</Text>
           </Pressable>
+        </View>
+
+        <View style={[styles.section, { marginTop: 32 }]}>
+          <Text style={[styles.sectionTitle, { color: C.text }]}>Appearance</Text>
+          <View style={[styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }]}>
+            <Ionicons name={isDark ? "moon" : "sunny-outline"} size={22} color={C.accent} />
+            <Text style={[styles.menuItemText, { color: C.text, flex: 1 }]}>Dark Mode</Text>
+            <Switch
+              value={isDark}
+              onValueChange={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                toggleTheme();
+              }}
+              trackColor={{ false: C.border, true: C.accent }}
+              thumbColor={Colors.white}
+            />
+          </View>
         </View>
       </View>
     );
@@ -79,7 +99,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: C.background }]}
       contentContainerStyle={{
         paddingTop: insets.top + webTopInset,
         paddingBottom: 100,
@@ -87,35 +107,35 @@ export default function ProfileScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={[styles.headerTitle, { color: C.text }]}>Profile</Text>
       </View>
 
-      <View style={styles.profileCard}>
+      <View style={[styles.profileCard, { backgroundColor: C.surface, borderColor: C.borderLight }]}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{user.name}</Text>
-          <Text style={styles.profileEmail}>{user.email}</Text>
+          <Text style={[styles.profileName, { color: C.text }]}>{user.name}</Text>
+          <Text style={[styles.profileEmail, { color: C.textSecondary }]}>{user.email}</Text>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
+        <Text style={[styles.sectionTitle, { color: C.text }]}>
           My Orders {orders ? `(${orders.length})` : ""}
         </Text>
         {loadingOrders ? (
-          <ActivityIndicator style={{ marginTop: 20 }} color={Colors.accent} />
+          <ActivityIndicator style={{ marginTop: 20 }} color={C.accent} />
         ) : !orders || orders.length === 0 ? (
           <View style={styles.emptyOrders}>
-            <Ionicons name="receipt-outline" size={36} color={Colors.textLight} />
-            <Text style={styles.emptyOrdersText}>No orders yet</Text>
+            <Ionicons name="receipt-outline" size={36} color={C.textLight} />
+            <Text style={[styles.emptyOrdersText, { color: C.textSecondary }]}>No orders yet</Text>
           </View>
         ) : (
           orders.map((order: any) => (
             <Pressable
               key={order.id}
-              style={({ pressed }) => [styles.orderCard, pressed && { opacity: 0.9 }]}
+              style={({ pressed }) => [styles.orderCard, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.9 }]}
               onPress={() =>
                 router.push({
                   pathname: "/order/[id]",
@@ -124,7 +144,7 @@ export default function ProfileScreen() {
               }
             >
               <View style={styles.orderCardTop}>
-                <Text style={styles.orderNumber}>Order #{order.id}</Text>
+                <Text style={[styles.orderNumber, { color: C.text }]}>Order #{order.id}</Text>
                 <View
                   style={[
                     styles.statusBadge,
@@ -142,10 +162,10 @@ export default function ProfileScreen() {
                 </View>
               </View>
               <View style={styles.orderCardBottom}>
-                <Text style={styles.orderDate}>
+                <Text style={[styles.orderDate, { color: C.textSecondary }]}>
                   {new Date(order.createdAt).toLocaleDateString()}
                 </Text>
-                <Text style={styles.orderTotal}>
+                <Text style={[styles.orderTotal, { color: C.text }]}>
                   ${parseFloat(order.total).toFixed(2)}
                 </Text>
               </View>
@@ -156,21 +176,37 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <Pressable
-          style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.85 }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/wishlist");
           }}
         >
-          <Ionicons name="heart-outline" size={22} color={Colors.accent} />
-          <Text style={[styles.menuItemText, { color: Colors.text }]}>Wishlist</Text>
-          <View style={{ flex: 1 }} />
-          <Ionicons name="chevron-forward" size={18} color={Colors.textLight} />
+          <Ionicons name="heart-outline" size={22} color={C.accent} />
+          <Text style={[styles.menuItemText, { color: C.text, flex: 1 }]}>Wishlist</Text>
+          <Ionicons name="chevron-forward" size={18} color={C.textLight} />
         </Pressable>
       </View>
 
       <View style={styles.section}>
-        <Pressable style={styles.menuItem} onPress={handleLogout}>
+        <Text style={[styles.sectionTitle, { color: C.text }]}>Appearance</Text>
+        <View style={[styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }]}>
+          <Ionicons name={isDark ? "moon" : "sunny-outline"} size={22} color={C.accent} />
+          <Text style={[styles.menuItemText, { color: C.text, flex: 1 }]}>Dark Mode</Text>
+          <Switch
+            value={isDark}
+            onValueChange={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              toggleTheme();
+            }}
+            trackColor={{ false: C.border, true: C.accent }}
+            thumbColor={Colors.white}
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Pressable style={[styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }]} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={22} color={Colors.error} />
           <Text style={[styles.menuItemText, { color: Colors.error }]}>Sign Out</Text>
         </Pressable>
