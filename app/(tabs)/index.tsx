@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect, useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,16 @@ import {
   Dimensions,
   Platform,
   RefreshControl,
+  FlatList,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+} from "react-native-reanimated";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,11 +31,30 @@ import { getImageUrl } from "@/lib/query-client";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48 - 12) / 2;
+const BANNER_WIDTH = width - 40;
+const BANNER_HEIGHT = 210;
+const AUTO_SCROLL_INTERVAL = 4000;
+
+function BannerDot({ index, activeIndex }: { index: number; activeIndex: number }) {
+  const dotStyle = useAnimatedStyle(() => {
+    const isActive = activeIndex === index;
+    return {
+      width: withTiming(isActive ? 20 : 6, { duration: 250 }),
+      opacity: withTiming(isActive ? 1 : 0.35, { duration: 250 }),
+      backgroundColor: isActive ? Colors.accent : Colors.white,
+    };
+  });
+  return <Animated.View style={[styles.dot, dotStyle]} />;
+}
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const bannerRef = useRef<FlatList>(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const userInteracting = useRef(false);
 
   const { data: featured, isLoading: loadingFeatured, refetch: refetchFeatured } = useQuery<any[]>({
     queryKey: ["/api/products/featured"],
@@ -41,6 +69,40 @@ export default function HomeScreen() {
   });
 
   const isLoading = loadingFeatured || loadingCategories || loadingProducts;
+  const bannerItems = featured && featured.length > 0 ? featured : [];
+
+  const startAutoScroll = useCallback(() => {
+    if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+    autoScrollTimer.current = setInterval(() => {
+      if (userInteracting.current || !bannerRef.current || bannerItems.length <= 1) return;
+      setActiveSlide((prev) => {
+        const next = (prev + 1) % bannerItems.length;
+        bannerRef.current?.scrollToIndex({ index: next, animated: true });
+        return next;
+      });
+    }, AUTO_SCROLL_INTERVAL);
+  }, [bannerItems.length]);
+
+  useEffect(() => {
+    if (bannerItems.length > 1) startAutoScroll();
+    return () => {
+      if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+    };
+  }, [bannerItems.length, startAutoScroll]);
+
+  const onBannerScrollBegin = useCallback(() => {
+    userInteracting.current = true;
+  }, []);
+
+  const onBannerScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      userInteracting.current = false;
+      const idx = Math.round(e.nativeEvent.contentOffset.x / BANNER_WIDTH);
+      setActiveSlide(idx);
+      startAutoScroll();
+    },
+    [startAutoScroll]
+  );
 
   function onRefresh() {
     refetchFeatured();
@@ -55,6 +117,25 @@ export default function HomeScreen() {
       </View>
     );
   }
+
+  const renderBannerItem = ({ item }: { item: any }) => (
+    <Pressable
+      style={styles.heroBanner}
+      onPress={() =>
+        router.push({ pathname: "/product/[id]", params: { id: item.id.toString() } })
+      }
+    >
+      <Image source={{ uri: getImageUrl(item.image) }} style={styles.heroImage} />
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.65)"]}
+        style={styles.heroGradient}
+      >
+        <Text style={styles.heroLabel}>Featured</Text>
+        <Text style={styles.heroTitle}>{item.name}</Text>
+        <Text style={styles.heroPrice}>${parseFloat(item.price).toFixed(2)}</Text>
+      </LinearGradient>
+    </Pressable>
+  );
 
   return (
     <ScrollView
@@ -84,22 +165,35 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      {featured && featured.length > 0 && (
+      {bannerItems.length > 0 && (
         <View style={styles.section}>
-          <Pressable
-            style={styles.heroBanner}
-            onPress={() => router.push({ pathname: "/product/[id]", params: { id: featured[0].id.toString() } })}
-          >
-            <Image source={{ uri: getImageUrl(featured[0].image) }} style={styles.heroImage} />
-            <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.7)"]}
-              style={styles.heroGradient}
-            >
-              <Text style={styles.heroLabel}>Featured</Text>
-              <Text style={styles.heroTitle}>{featured[0].name}</Text>
-              <Text style={styles.heroPrice}>${parseFloat(featured[0].price).toFixed(2)}</Text>
-            </LinearGradient>
-          </Pressable>
+          <FlatList
+            ref={bannerRef}
+            data={bannerItems}
+            renderItem={renderBannerItem}
+            keyExtractor={(item) => item.id.toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={BANNER_WIDTH}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            contentContainerStyle={{ paddingHorizontal: 20 }}
+            onScrollBeginDrag={onBannerScrollBegin}
+            onMomentumScrollEnd={onBannerScrollEnd}
+            onScrollEndDrag={onBannerScrollEnd}
+            getItemLayout={(_, index) => ({
+              length: BANNER_WIDTH,
+              offset: BANNER_WIDTH * index,
+              index,
+            })}
+          />
+          {bannerItems.length > 1 && (
+            <View style={styles.dotsRow}>
+              {bannerItems.map((_: any, i: number) => (
+                <BannerDot key={i} index={i} activeIndex={activeSlide} />
+              ))}
+            </View>
+          )}
         </View>
       )}
 
@@ -226,10 +320,10 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   heroBanner: {
-    marginHorizontal: 20,
+    width: BANNER_WIDTH,
     borderRadius: 16,
     overflow: "hidden",
-    height: 200,
+    height: BANNER_HEIGHT,
   },
   heroImage: {
     width: "100%",
@@ -242,6 +336,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 16,
+    paddingBottom: 20,
   },
   heroLabel: {
     fontSize: 11,
@@ -261,6 +356,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     color: Colors.white,
+  },
+  dotsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
+    gap: 5,
+  },
+  dot: {
+    height: 6,
+    borderRadius: 3,
   },
   categoriesRow: {
     paddingHorizontal: 20,
