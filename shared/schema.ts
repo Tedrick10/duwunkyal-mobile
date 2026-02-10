@@ -83,6 +83,17 @@ export const orderItems = pgTable("order_items", {
   color: text("color"),
 });
 
+export const wishlistItems = pgTable("wishlist_items", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .references(() => users.id)
+    .notNull(),
+  productId: integer("product_id")
+    .references(() => products.id)
+    .notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   password: true,
@@ -133,3 +144,4 @@ export type CartItem = typeof cartItems.$inferSelect;
 export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
 export type Order = typeof orders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
+export type WishlistItem = typeof wishlistItems.$inferSelect;

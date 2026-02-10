@@ -1,4 +1,4 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -7,6 +7,7 @@ import {
   cartItems,
   orders,
   orderItems,
+  wishlistItems,
   type User,
   type InsertUser,
   type Category,
@@ -17,6 +18,7 @@ import {
   type InsertCartItem,
   type Order,
   type OrderItem,
+  type WishlistItem,
 } from "@shared/schema";
 
 export async function createUser(data: InsertUser & { password: string }): Promise<User> {
@@ -167,6 +169,34 @@ export async function getOrderItems(orderId: number): Promise<(OrderItem & { pro
 export async function updateOrderStatus(id: number, status: string): Promise<Order> {
   const [order] = await db.update(orders).set({ status }).where(eq(orders.id, id)).returning();
   return order;
+}
+
+export async function getWishlistItems(userId: number): Promise<(WishlistItem & { product: Product })[]> {
+  const items = await db.select().from(wishlistItems).where(eq(wishlistItems.userId, userId)).orderBy(desc(wishlistItems.createdAt));
+  const result: (WishlistItem & { product: Product })[] = [];
+  for (const item of items) {
+    const product = await getProductById(item.productId);
+    if (product) {
+      result.push({ ...item, product });
+    }
+  }
+  return result;
+}
+
+export async function addToWishlist(userId: number, productId: number): Promise<WishlistItem> {
+  const existing = await db.select().from(wishlistItems).where(and(eq(wishlistItems.userId, userId), eq(wishlistItems.productId, productId)));
+  if (existing.length > 0) return existing[0];
+  const [item] = await db.insert(wishlistItems).values({ userId, productId }).returning();
+  return item;
+}
+
+export async function removeFromWishlist(userId: number, productId: number): Promise<void> {
+  await db.delete(wishlistItems).where(and(eq(wishlistItems.userId, userId), eq(wishlistItems.productId, productId)));
+}
+
+export async function isInWishlist(userId: number, productId: number): Promise<boolean> {
+  const items = await db.select().from(wishlistItems).where(and(eq(wishlistItems.userId, userId), eq(wishlistItems.productId, productId)));
+  return items.length > 0;
 }
 
 export async function getStats(): Promise<{ totalUsers: number; totalProducts: number; totalOrders: number; totalRevenue: number }> {

@@ -273,6 +273,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ message: "Deleted" });
   });
 
+  app.get("/api/wishlist", requireAuth, async (req: Request, res: Response) => {
+    const items = await storage.getWishlistItems(req.session.userId!);
+    res.json(items);
+  });
+
+  app.get("/api/wishlist/check/:productId", requireAuth, async (req: Request, res: Response) => {
+    const inWishlist = await storage.isInWishlist(req.session.userId!, parseInt(req.params.productId));
+    res.json({ inWishlist });
+  });
+
+  app.post("/api/wishlist", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { productId } = req.body;
+      const item = await storage.addToWishlist(req.session.userId!, productId);
+      res.json(item);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/wishlist/:productId", requireAuth, async (req: Request, res: Response) => {
+    await storage.removeFromWishlist(req.session.userId!, parseInt(req.params.productId));
+    res.json({ message: "Removed" });
+  });
+
   app.get("/admin", (_req: Request, res: Response) => {
     res.sendFile("admin.html", { root: "server/templates" });
   });
