@@ -17,6 +17,7 @@
     var urlParams = new URLSearchParams(window.location.search);
     var isInWebView = urlParams.get('webview') === '1';
     var productImage = urlParams.get('image') || '';
+    var productImageBack = urlParams.get('imageBack') || '';
     if (isInWebView) {
       document.documentElement.classList.add('in-webview');
     }
@@ -573,6 +574,7 @@
     const defaultFrontImg = '/assets/products/tshirt-front.png';
     const defaultBackImg = '/assets/products/tshirt-back.png';
     const productFrontImg = productImage || defaultFrontImg;
+    const productBackImg = productImageBack || defaultBackImg;
 
     const bgImg = document.getElementById('tshirt-bg');
     bgImg.src = productFrontImg;
@@ -681,7 +683,7 @@
       document.getElementById('view-front').classList.toggle('active', view === 'front');
       document.getElementById('view-back').classList.toggle('active', view === 'back');
 
-      document.getElementById('tshirt-bg').src = view === 'front' ? productFrontImg : defaultBackImg;
+      document.getElementById('tshirt-bg').src = view === 'front' ? productFrontImg : productBackImg;
 
       loadView(view);
       updateTexture();

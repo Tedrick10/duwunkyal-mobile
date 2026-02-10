@@ -15,16 +15,17 @@ import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 
 export default function CustomizeScreen() {
-  const { id, image } = useLocalSearchParams();
+  const { id, image, imageBack } = useLocalSearchParams();
   const webViewRef = useRef<WebView>(null);
   const insets = useSafeAreaInsets();
 
   const baseUrl = getApiUrl();
   const customizeUrlBase = `${baseUrl.replace(/\/$/, "")}/customize/${id}`;
   const imageParam = image ? `&image=${encodeURIComponent(image as string)}` : "";
+  const imageBackParam = imageBack ? `&imageBack=${encodeURIComponent(imageBack as string)}` : "";
   const customizeUrl = Platform.OS === "web"
-    ? `${customizeUrlBase}${image ? `?image=${encodeURIComponent(image as string)}` : ""}`
-    : `${customizeUrlBase}?webview=1${imageParam}`;
+    ? `${customizeUrlBase}?${image ? `image=${encodeURIComponent(image as string)}` : ""}${imageBack ? `&imageBack=${encodeURIComponent(imageBack as string)}` : ""}`
+    : `${customizeUrlBase}?webview=1${imageParam}${imageBackParam}`;
 
   useEffect(() => {
     if (Platform.OS === "web") {
