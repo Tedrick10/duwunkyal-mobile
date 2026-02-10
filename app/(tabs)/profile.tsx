@@ -7,16 +7,14 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
-  Image,
 } from "react-native";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, queryClient, getImageUrl } from "@/lib/query-client";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -26,21 +24,6 @@ export default function ProfileScreen() {
   const { data: orders, isLoading: loadingOrders } = useQuery<any[]>({
     queryKey: ["/api/orders"],
     enabled: !!user,
-  });
-
-  const { data: wishlist, isLoading: loadingWishlist } = useQuery<any[]>({
-    queryKey: ["/api/wishlist"],
-    enabled: !!user,
-  });
-
-  const removeWishlistMutation = useMutation({
-    mutationFn: async (productId: number) => {
-      await apiRequest("DELETE", `/api/wishlist/${productId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] });
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    },
   });
 
   if (!user) {
@@ -172,52 +155,18 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Wishlist {wishlist ? `(${wishlist.length})` : ""}
-        </Text>
-        {loadingWishlist ? (
-          <ActivityIndicator style={{ marginTop: 20 }} color={Colors.accent} />
-        ) : !wishlist || wishlist.length === 0 ? (
-          <View style={styles.emptyOrders}>
-            <Ionicons name="heart-outline" size={36} color={Colors.textLight} />
-            <Text style={styles.emptyOrdersText}>Your wishlist is empty</Text>
-          </View>
-        ) : (
-          wishlist.map((item: any) => (
-            <Pressable
-              key={item.id}
-              style={({ pressed }) => [styles.wishlistCard, pressed && { opacity: 0.9 }]}
-              onPress={() =>
-                router.push({
-                  pathname: "/product/[id]",
-                  params: { id: item.product.id.toString() },
-                })
-              }
-            >
-              <Image
-                source={{ uri: getImageUrl(item.product.image) }}
-                style={styles.wishlistImage}
-              />
-              <View style={styles.wishlistInfo}>
-                <Text style={styles.wishlistName} numberOfLines={2}>
-                  {item.product.name}
-                </Text>
-                <Text style={styles.wishlistPrice}>
-                  ${parseFloat(item.product.price).toFixed(2)}
-                </Text>
-              </View>
-              <Pressable
-                style={styles.wishlistRemoveBtn}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  removeWishlistMutation.mutate(item.product.id);
-                }}
-              >
-                <Ionicons name="heart" size={20} color={Colors.accent} />
-              </Pressable>
-            </Pressable>
-          ))
-        )}
+        <Pressable
+          style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.85 }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/wishlist");
+          }}
+        >
+          <Ionicons name="heart-outline" size={22} color={Colors.accent} />
+          <Text style={[styles.menuItemText, { color: Colors.text }]}>Wishlist</Text>
+          <View style={{ flex: 1 }} />
+          <Ionicons name="chevron-forward" size={18} color={Colors.textLight} />
+        </Pressable>
       </View>
 
       <View style={styles.section}>
@@ -377,46 +326,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
-  },
-  wishlistCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  wishlistImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
-    backgroundColor: Colors.white,
-    resizeMode: "contain",
-  },
-  wishlistInfo: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: "center",
-  },
-  wishlistName: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  wishlistPrice: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    color: Colors.accent,
-  },
-  wishlistRemoveBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
   },
   menuItem: {
     flexDirection: "row",
