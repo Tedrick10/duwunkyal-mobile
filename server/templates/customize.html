@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>StyleVault - Customize</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   <script type="importmap">
@@ -14,14 +14,16 @@
   }
   </script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #f5f5f5;
       overflow: hidden;
       height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
+      touch-action: manipulation;
     }
 
     .top-bar {
@@ -30,46 +32,67 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 16px;
-      height: 48px;
+      padding: 0 8px;
+      height: 44px;
       flex-shrink: 0;
+      gap: 4px;
     }
-    .top-bar-left { display: flex; align-items: center; gap: 16px; }
+    .top-bar-left {
+      display: flex;
+      align-items: center;
+    }
     .top-bar-left .back-btn {
       background: none; border: none; color: #fff; cursor: pointer;
-      display: flex; align-items: center; gap: 6px; font-size: 14px;
-      padding: 6px 10px; border-radius: 6px;
+      display: flex; align-items: center; gap: 4px; font-size: 13px;
+      padding: 6px 8px; border-radius: 6px;
     }
-    .top-bar-left .back-btn:hover { background: rgba(255,255,255,0.1); }
-    .top-bar-center { display: flex; align-items: center; gap: 12px; }
-    .top-bar-center button {
+    .top-bar-center {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+      justify-content: center;
+    }
+    .top-bar-center .icon-btn {
       background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer;
-      width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
-      border-radius: 6px; font-size: 18px;
+      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      border-radius: 6px; font-size: 16px;
     }
-    .top-bar-center button:hover { color: #fff; background: rgba(255,255,255,0.1); }
-    .top-bar-right { display: flex; align-items: center; gap: 8px; }
+    .top-bar-center .icon-btn:active { color: #fff; background: rgba(255,255,255,0.15); }
+    .top-bar-right { display: flex; align-items: center; gap: 4px; }
     .top-bar-right button {
       background: none; border: none; color: rgba(255,255,255,0.8); cursor: pointer;
-      padding: 6px 12px; border-radius: 6px; font-size: 13px;
+      padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
     }
-    .top-bar-right button:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .top-bar-right button:active { background: rgba(255,255,255,0.15); color: #fff; }
 
     .mode-toggle {
       display: flex;
       background: rgba(255,255,255,0.1);
-      border-radius: 8px;
+      border-radius: 6px;
       overflow: hidden;
     }
     .mode-toggle button {
-      padding: 6px 16px !important;
-      font-size: 13px !important;
+      padding: 5px 10px !important;
+      font-size: 11px !important;
       font-weight: 600;
       transition: all 0.2s;
+      white-space: nowrap;
+      border: none;
+      background: none;
+      color: rgba(255,255,255,0.6);
+      cursor: pointer;
     }
     .mode-toggle button.active {
       background: #e94560 !important;
       color: #fff !important;
+    }
+
+    .save-btn {
+      background: #e94560 !important;
+      color: #fff !important;
+      border-radius: 6px;
+      white-space: nowrap;
     }
 
     .main-area {
@@ -98,8 +121,8 @@
 
     .tshirt-container {
       position: relative;
-      width: 500px;
-      height: 560px;
+      width: 320px;
+      height: 380px;
     }
     .tshirt-bg-img {
       position: absolute;
@@ -117,52 +140,35 @@
 
     .view-switcher {
       position: absolute;
-      bottom: 16px;
-      right: 16px;
+      bottom: 10px;
+      right: 10px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       z-index: 10;
     }
     .view-switcher button {
       background: #fff;
       border: 2px solid #ddd;
-      border-radius: 8px;
-      padding: 8px 16px;
+      border-radius: 6px;
+      padding: 6px 12px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       color: #333;
-      transition: all 0.2s;
     }
     .view-switcher button.active {
       border-color: #e94560;
       color: #e94560;
       background: #fff0f3;
     }
-    .view-page {
-      position: absolute;
-      bottom: 16px;
-      right: 16px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      color: #888;
-      z-index: 10;
-    }
-    .view-page button {
-      background: none; border: none; cursor: pointer;
-      color: #666; font-size: 16px; padding: 4px 8px;
-    }
-    .view-page button:hover { color: #333; }
 
     .preview-3d-mini {
       position: absolute;
-      bottom: 16px;
-      left: 16px;
-      width: 100px;
-      height: 100px;
+      bottom: 10px;
+      left: 10px;
+      width: 70px;
+      height: 70px;
       background: #fff;
       border: 1px solid #ddd;
       border-radius: 8px;
@@ -171,49 +177,84 @@
       z-index: 10;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
-    .preview-3d-mini:hover { border-color: #e94560; }
     .preview-3d-mini .label {
-      position: absolute; top: 4px; left: 6px;
-      font-size: 11px; font-weight: 700; color: #555;
+      position: absolute; top: 3px; left: 5px;
+      font-size: 9px; font-weight: 700; color: #555;
     }
     .preview-3d-mini .expand {
-      position: absolute; top: 4px; right: 6px;
-      font-size: 12px; color: #888;
+      position: absolute; top: 3px; right: 5px;
+      font-size: 10px; color: #888;
     }
     .preview-3d-mini canvas {
       width: 100% !important;
       height: 100% !important;
     }
 
+    .tshirt-color-bar {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 10;
+    }
+    .tshirt-color-opt {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 2.5px solid transparent;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+    .tshirt-color-opt.active { border-color: #e94560; }
+
     .bottom-toolbar {
       background: #fff;
       border-top: 1px solid #e0e0e0;
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 10px 20px;
-      gap: 0;
+      justify-content: space-around;
+      padding: 6px 8px;
       flex-shrink: 0;
-      height: 56px;
+      height: 52px;
     }
     .toolbar-btn {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 6px;
-      padding: 8px 20px;
+      gap: 2px;
+      padding: 4px 8px;
       background: none;
       border: none;
       cursor: pointer;
+      font-size: 10px;
+      font-weight: 600;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border-radius: 6px;
+      flex: 1;
+    }
+    .toolbar-btn:active { background: #f0f0f0; color: #e94560; }
+    .toolbar-btn svg { width: 20px; height: 20px; }
+
+    .delete-btn {
+      position: absolute;
+      top: 8px; left: 50%; transform: translateX(-50%);
+      background: #e94560;
+      color: #fff;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 8px;
+      cursor: pointer;
       font-size: 12px;
       font-weight: 600;
-      color: #444;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      transition: all 0.2s;
-      border-radius: 6px;
+      z-index: 20;
+      display: none;
+      box-shadow: 0 2px 10px rgba(233,69,96,0.3);
     }
-    .toolbar-btn:hover { background: #f0f0f0; color: #e94560; }
-    .toolbar-btn svg { width: 18px; height: 18px; }
+    .delete-btn.show { display: block; }
 
     .editor-3d {
       flex: 1;
@@ -231,9 +272,9 @@
 
     .minimize-btn {
       position: absolute;
-      top: 12px;
-      right: 12px;
-      background: rgba(0,0,0,0.05);
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.06);
       border: none;
       width: 36px; height: 36px;
       border-radius: 8px;
@@ -245,11 +286,10 @@
       color: #555;
       z-index: 10;
     }
-    .minimize-btn:hover { background: rgba(0,0,0,0.1); }
     .mode-3d-label {
       position: absolute;
-      top: 14px; left: 16px;
-      font-size: 14px; font-weight: 700; color: #555;
+      top: 14px; left: 14px;
+      font-size: 13px; font-weight: 700; color: #555;
       z-index: 10;
     }
 
@@ -259,35 +299,37 @@
       top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0,0,0,0.4);
       z-index: 100;
-      align-items: center;
+      align-items: flex-end;
       justify-content: center;
     }
     .text-modal-overlay.show { display: flex; }
     .text-modal {
       background: #fff;
-      border-radius: 14px;
-      padding: 28px;
-      width: 400px;
-      max-width: 90%;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      border-radius: 16px 16px 0 0;
+      padding: 20px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+      max-height: 80vh;
+      overflow-y: auto;
     }
     .text-modal h3 {
-      margin-bottom: 16px;
-      font-size: 18px;
+      margin-bottom: 14px;
+      font-size: 16px;
       color: #1a1a2e;
     }
     .text-modal input, .text-modal select {
       width: 100%;
-      padding: 10px 14px;
+      padding: 10px 12px;
       border: 1.5px solid #ddd;
       border-radius: 8px;
       font-size: 14px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       outline: none;
     }
     .text-modal input:focus, .text-modal select:focus { border-color: #e94560; }
     .text-modal label {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       color: #555;
       display: block;
@@ -295,17 +337,17 @@
     }
     .text-modal-row {
       display: flex;
-      gap: 12px;
+      gap: 10px;
     }
     .text-modal-row > div { flex: 1; }
     .text-modal-btns {
       display: flex;
       justify-content: flex-end;
-      gap: 10px;
+      gap: 8px;
       margin-top: 8px;
     }
     .text-modal-btns button {
-      padding: 10px 24px;
+      padding: 10px 20px;
       border-radius: 8px;
       border: none;
       cursor: pointer;
@@ -313,88 +355,68 @@
       font-weight: 600;
     }
     .btn-cancel { background: #f0f0f0; color: #555; }
-    .btn-cancel:hover { background: #e0e0e0; }
     .btn-add { background: #e94560; color: #fff; }
-    .btn-add:hover { background: #d63d56; }
 
     .color-picker-row {
       display: flex;
       gap: 8px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       flex-wrap: wrap;
     }
     .color-swatch {
-      width: 30px; height: 30px;
+      width: 28px; height: 28px;
       border-radius: 6px;
       border: 2px solid #ddd;
       cursor: pointer;
-      transition: transform 0.15s;
     }
-    .color-swatch:hover { transform: scale(1.1); }
-    .color-swatch.selected { border-color: #e94560; transform: scale(1.15); }
+    .color-swatch.selected { border-color: #e94560; transform: scale(1.1); }
 
-    .delete-btn {
-      position: absolute;
-      top: 12px; left: 50%; transform: translateX(-50%);
-      background: #e94560;
-      color: #fff;
-      border: none;
-      padding: 8px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 600;
-      z-index: 20;
-      display: none;
-      box-shadow: 0 2px 10px rgba(233,69,96,0.3);
+    @media (min-width: 600px) {
+      .top-bar { padding: 0 16px; height: 48px; gap: 8px; }
+      .top-bar-left .back-btn { font-size: 14px; padding: 6px 10px; }
+      .mode-toggle button { padding: 6px 14px !important; font-size: 13px !important; }
+      .top-bar-right button { font-size: 13px; padding: 6px 12px; }
+      .tshirt-container { width: 500px; height: 560px; }
+      .tshirt-color-opt { width: 32px; height: 32px; }
+      .tshirt-color-bar { left: 16px; gap: 8px; }
+      .preview-3d-mini { width: 100px; height: 100px; }
+      .bottom-toolbar { height: 56px; padding: 10px 20px; justify-content: center; gap: 0; }
+      .toolbar-btn {
+        flex-direction: row; gap: 6px; padding: 8px 20px;
+        font-size: 12px; flex: unset;
+      }
+      .text-modal {
+        border-radius: 14px;
+        max-width: 400px;
+        margin-bottom: 0;
+      }
+      .text-modal-overlay { align-items: center; }
     }
-    .delete-btn.show { display: block; }
-
-    .tshirt-color-bar {
-      position: absolute;
-      left: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      z-index: 10;
-    }
-    .tshirt-color-opt {
-      width: 32px; height: 32px;
-      border-radius: 50%;
-      border: 3px solid transparent;
-      cursor: pointer;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-      transition: all 0.2s;
-    }
-    .tshirt-color-opt.active { border-color: #e94560; }
-    .tshirt-color-opt:hover { transform: scale(1.1); }
   </style>
 </head>
 <body>
   <div class="top-bar">
     <div class="top-bar-left">
       <button class="back-btn" onclick="window.history.back()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        Back
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <span class="back-label">Back</span>
       </button>
     </div>
     <div class="top-bar-center">
-      <button onclick="undo()" title="Undo">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a5 5 0 015 5v2M3 10l5-5M3 10l5 5"/></svg>
+      <button class="icon-btn" onclick="undo()" title="Undo">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a5 5 0 015 5v2M3 10l5-5M3 10l5 5"/></svg>
       </button>
-      <button onclick="redo()" title="Redo">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10H11a5 5 0 00-5 5v2M21 10l-5-5M21 10l-5 5"/></svg>
+      <button class="icon-btn" onclick="redo()" title="Redo">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10H11a5 5 0 00-5 5v2M21 10l-5-5M21 10l-5 5"/></svg>
       </button>
       <div class="mode-toggle">
         <button id="mode-design" class="active" onclick="switchMode('design')">Design</button>
-        <button id="mode-preview" onclick="switchMode('preview')">3D Preview</button>
+        <button id="mode-preview" onclick="switchMode('preview')">3D</button>
       </div>
     </div>
     <div class="top-bar-right">
       <button onclick="clearCanvas()">Clear</button>
-      <button onclick="downloadDesign()" style="background:#e94560;color:#fff;border-radius:6px;">Save Design</button>
+      <button class="save-btn" onclick="downloadDesign()">Save</button>
     </div>
   </div>
 
@@ -417,7 +439,7 @@
           </div>
         </div>
 
-        <button class="delete-btn" id="delete-btn" onclick="deleteSelected()">Delete Selected</button>
+        <button class="delete-btn" id="delete-btn" onclick="deleteSelected()">Delete</button>
 
         <div class="preview-3d-mini" id="mini-3d" onclick="switchMode('preview')">
           <span class="label">3D</span>
@@ -434,25 +456,25 @@
       <div class="bottom-toolbar">
         <button class="toolbar-btn" onclick="openImageUpload()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-          Add Image
+          Image
         </button>
         <button class="toolbar-btn" onclick="openTextModal()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
-          Add Text
+          Text
         </button>
         <button class="toolbar-btn" onclick="addShape('rect')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-          Add Shape
+          Shape
         </button>
         <button class="toolbar-btn" onclick="addShape('circle')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
-          Add Circle
+          Circle
         </button>
       </div>
     </div>
 
     <div class="editor-3d" id="editor-3d">
-      <span class="mode-3d-label">3D</span>
+      <span class="mode-3d-label">3D Preview</span>
       <button class="minimize-btn" onclick="switchMode('design')" title="Back to Design">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>
       </button>
@@ -496,17 +518,17 @@
         <div class="color-swatch" data-color="#9b59b6" style="background:#9b59b6" onclick="selectTextColor(this)"></div>
       </div>
       <label>Style</label>
-      <div class="text-modal-row" style="margin-bottom:12px">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <div class="text-modal-row" style="margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
           <input type="checkbox" id="text-bold" /> Bold
         </label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
           <input type="checkbox" id="text-italic" /> Italic
         </label>
       </div>
       <div class="text-modal-btns">
         <button class="btn-cancel" onclick="closeTextModal()">Cancel</button>
-        <button class="btn-add" onclick="addTextToCanvas()">Add Text</button>
+        <button class="btn-add" onclick="addTextToCanvas()">Add</button>
       </div>
     </div>
   </div>
@@ -518,10 +540,14 @@
     import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-    const DESIGN_W = 240;
-    const DESIGN_H = 320;
-    const DESIGN_LEFT = 130;
-    const DESIGN_TOP = 80;
+    const isMobile = window.innerWidth < 600;
+    const CONTAINER_W = isMobile ? 320 : 500;
+    const CONTAINER_H = isMobile ? 380 : 560;
+    const SCALE = CONTAINER_W / 500;
+    const DESIGN_W = Math.round(240 * SCALE);
+    const DESIGN_H = Math.round(320 * SCALE);
+    const DESIGN_LEFT = Math.round(130 * SCALE);
+    const DESIGN_TOP = Math.round(80 * SCALE);
 
     let currentView = 'front';
     let currentMode = 'design';
@@ -530,6 +556,10 @@
 
     const frontCanvasData = { json: null };
     const backCanvasData = { json: null };
+
+    const container = document.getElementById('tshirt-container');
+    container.style.width = CONTAINER_W + 'px';
+    container.style.height = CONTAINER_H + 'px';
 
     const fabricCanvas = new fabric.Canvas('fabric-canvas', {
       width: DESIGN_W,
@@ -686,7 +716,7 @@
     window.openTextModal = function() {
       document.getElementById('text-modal').classList.add('show');
       document.getElementById('text-input').value = '';
-      document.getElementById('text-input').focus();
+      setTimeout(() => document.getElementById('text-input').focus(), 100);
     };
 
     window.closeTextModal = function() {
@@ -805,7 +835,7 @@
       ctx.drawImage(bgImg, 0, 0, 500, 560);
 
       const designImg = fabricCanvas.toCanvasElement();
-      ctx.drawImage(designImg, DESIGN_LEFT, DESIGN_TOP, DESIGN_W, DESIGN_H);
+      ctx.drawImage(designImg, 130, 80, 240, 320);
 
       const link = document.createElement('a');
       link.download = 'tshirt-design.png';
@@ -828,9 +858,9 @@
       ctx.fillRect(0, 0, 1024, 1024);
 
       const designCanvas = fabricCanvas.toCanvasElement();
-      const sx = (1024 - DESIGN_W * 2) / 2;
+      const sx = (1024 - 240 * 2) / 2;
       const sy = 100;
-      ctx.drawImage(designCanvas, sx, sy, DESIGN_W * 2, DESIGN_H * 2);
+      ctx.drawImage(designCanvas, sx, sy, 240 * 2, 320 * 2);
 
       return texCanvas;
     }
@@ -919,6 +949,7 @@
 
     function initMini3D() {
       const canvas = document.getElementById('mini-3d-canvas');
+      const miniSize = isMobile ? 70 : 100;
 
       miniScene = new THREE.Scene();
       miniScene.background = new THREE.Color(0xf8f8f8);
@@ -927,7 +958,7 @@
       miniCamera.position.set(0, 0, 3);
 
       miniRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-      miniRenderer.setSize(100, 100);
+      miniRenderer.setSize(miniSize, miniSize);
       miniRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       miniRenderer.outputColorSpace = THREE.SRGBColorSpace;
 
