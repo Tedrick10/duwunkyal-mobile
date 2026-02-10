@@ -2,7 +2,7 @@
 
 ## Overview
 
-StyleVault is a full-stack mobile e-commerce application for a garment/clothing store. It uses **Expo (React Native)** for the frontend and **Express.js** for the backend API, with **PostgreSQL** as the database via **Drizzle ORM**. The app supports browsing products by category, searching, cart management, checkout with order placement, user authentication, and an admin panel for store management.
+StyleVault is a full-stack mobile e-commerce application for a garment/clothing store. It uses **Expo (React Native)** for the frontend and **Express.js** for the backend API, with **PostgreSQL** as the database via **Drizzle ORM**. The app supports browsing products by category, searching, cart management, checkout with order placement, user authentication, an admin panel for store management, and a **product customization editor** with 2D design (fabric.js) and 3D preview (three.js).
 
 ## User Preferences
 
@@ -39,6 +39,10 @@ Preferred communication style: Simple, everyday language.
 - **Authentication**: Session-based using `express-session` with `connect-pg-simple` for PostgreSQL session storage. Passwords hashed with `bcryptjs`.
 - **Middleware**: `requireAuth` and `requireAdmin` middleware functions for route protection
 - **Admin Panel**: Server-rendered HTML admin interface at `server/templates/admin.html`
+- **Product Customizer**: Server-rendered HTML editor at `server/templates/customize.html` — 2D design via fabric.js (CDN), 3D preview via three.js (CDN) with OBJ model loading
+  - Route: `/customize/:id`
+  - OBJ models stored in `public/models/` (man_tshirt.obj, woman_tshirt.obj), served via `/models/` static route
+  - Features: Front/back view switching, add text/images/shapes, t-shirt color picker, undo/redo, 3D preview with OrbitControls, save design as PNG
 - **Storage Layer**: `server/storage.ts` — Data access functions using Drizzle ORM queries
 
 ### Database
