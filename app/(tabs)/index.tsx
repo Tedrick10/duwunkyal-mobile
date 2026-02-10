@@ -26,6 +26,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 import { getImageUrl } from "@/lib/query-client";
 
 const { width } = Dimensions.get("window");
@@ -50,6 +51,7 @@ function BannerDot({ index, activeIndex }: { index: number; activeIndex: number 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { colors: C } = useTheme();
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const bannerRef = useRef<FlatList>(null);
   const [activeSlide, setActiveSlide] = useState(0);
@@ -112,7 +114,7 @@ export default function HomeScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.loadingContainer, { paddingTop: insets.top + webTopInset }]}>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top + webTopInset, backgroundColor: C.background }]}>
         <ActivityIndicator size="large" color={Colors.accent} />
       </View>
     );
@@ -131,20 +133,20 @@ export default function HomeScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: C.background }]}
       contentContainerStyle={{ paddingBottom: 100, paddingTop: insets.top + webTopInset }}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} tintColor={Colors.accent} />}
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>
+          <Text style={[styles.greeting, { color: C.textSecondary }]}>
             {user ? `Hi, ${user.name.split(" ")[0]}` : "Welcome"}
           </Text>
-          <Text style={styles.headerTitle}>StyleVault</Text>
+          <Text style={[styles.headerTitle, { color: C.text }]}>StyleVault</Text>
         </View>
         <Pressable
-          style={styles.notifBtn}
+          style={[styles.notifBtn, { backgroundColor: C.surface, borderColor: C.border }]}
           onPress={() => {
             if (!user) router.push("/(auth)/login");
           }}
@@ -152,7 +154,7 @@ export default function HomeScreen() {
           <Ionicons
             name={user ? "notifications-outline" : "person-outline"}
             size={22}
-            color={Colors.text}
+            color={C.text}
           />
         </Pressable>
       </View>
@@ -192,17 +194,17 @@ export default function HomeScreen() {
       {categories && categories.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Categories</Text>
+            <Text style={[styles.sectionTitle, { color: C.text }]}>Categories</Text>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesRow}>
             {categories.map((cat: any) => (
               <Pressable
                 key={cat.id}
-                style={({ pressed }) => [styles.categoryChip, pressed && { opacity: 0.8 }]}
+                style={({ pressed }) => [styles.categoryChip, { backgroundColor: C.surface, borderColor: C.border }, pressed && { opacity: 0.8 }]}
                 onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat.id.toString() } })}
               >
                 {cat.image && <Image source={{ uri: getImageUrl(cat.image) }} style={styles.categoryChipImage} />}
-                <Text style={styles.categoryChipText}>{cat.name}</Text>
+                <Text style={[styles.categoryChipText, { color: C.text }]}>{cat.name}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -212,20 +214,20 @@ export default function HomeScreen() {
       {featured && featured.length > 1 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Hot Right Now</Text>
+            <Text style={[styles.sectionTitle, { color: C.text }]}>Hot Right Now</Text>
             <Ionicons name="flame" size={18} color={Colors.accent} />
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredRow}>
             {featured.slice(1).map((product: any) => (
               <Pressable
                 key={product.id}
-                style={({ pressed }) => [styles.featuredCard, pressed && { opacity: 0.9 }]}
+                style={({ pressed }) => [styles.featuredCard, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.9 }]}
                 onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
-                <View style={styles.featuredImageContainer}>
+                <View style={[styles.featuredImageContainer, { backgroundColor: C.surface }]}>
                   <Image source={{ uri: getImageUrl(product.image) }} style={styles.featuredImage} />
                 </View>
-                <Text style={styles.featuredName} numberOfLines={1}>{product.name}</Text>
+                <Text style={[styles.featuredName, { color: C.text }]} numberOfLines={1}>{product.name}</Text>
                 <Text style={styles.featuredPrice}>${parseFloat(product.price).toFixed(2)}</Text>
               </Pressable>
             ))}
@@ -236,20 +238,20 @@ export default function HomeScreen() {
       {products && products.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>All Products</Text>
+            <Text style={[styles.sectionTitle, { color: C.text }]}>All Products</Text>
           </View>
           <View style={styles.productsGrid}>
             {products.map((product: any) => (
               <Pressable
                 key={product.id}
-                style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.9 }]}
+                style={({ pressed }) => [styles.productCard, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.9 }]}
                 onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
-                <View style={styles.productImageContainer}>
+                <View style={[styles.productImageContainer, { backgroundColor: C.surface }]}>
                   <Image source={{ uri: getImageUrl(product.image) }} style={styles.productImage} />
                 </View>
                 <View style={styles.productInfo}>
-                  <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+                  <Text style={[styles.productName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
                   <Text style={styles.productPrice}>${parseFloat(product.price).toFixed(2)}</Text>
                 </View>
               </Pressable>

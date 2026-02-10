@@ -2,11 +2,12 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { NativeTabs, Icon, Label, Badge } from "expo-router/unstable-native-tabs";
 import { BlurView } from "expo-blur";
-import { Platform, StyleSheet, useColorScheme, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import Colors from "@/constants/colors";
+import { useTheme } from "@/lib/theme-context";
 
 function NativeTabLayout() {
   return (
@@ -32,8 +33,7 @@ function NativeTabLayout() {
 }
 
 function ClassicTabLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { isDark, colors: C } = useTheme();
   const isWeb = Platform.OS === "web";
   const isIOS = Platform.OS === "ios";
 
@@ -41,13 +41,13 @@ function ClassicTabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.accent,
-        tabBarInactiveTintColor: Colors.textLight,
+        tabBarActiveTintColor: C.accent,
+        tabBarInactiveTintColor: C.textLight,
         tabBarStyle: {
           position: "absolute" as const,
-          backgroundColor: isIOS ? "transparent" : isDark ? "#000" : "#fff",
+          backgroundColor: isIOS ? "transparent" : isDark ? C.background : C.surface,
           borderTopWidth: isWeb ? 1 : 0,
-          borderTopColor: isDark ? "#333" : Colors.border,
+          borderTopColor: C.border,
           elevation: 0,
           ...(isWeb ? { height: 84 } : {}),
         },
@@ -62,7 +62,7 @@ function ClassicTabLayout() {
             <View
               style={[
                 StyleSheet.absoluteFill,
-                { backgroundColor: isDark ? "#000" : "#fff" },
+                { backgroundColor: isDark ? C.background : C.surface },
               ]}
             />
           ) : null,

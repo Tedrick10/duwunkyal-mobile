@@ -16,6 +16,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { useTheme } from "@/lib/theme-context";
 import { getImageUrl } from "@/lib/query-client";
 
 const { width } = Dimensions.get("window");
@@ -23,6 +24,7 @@ const CARD_WIDTH = (width - 48 - 12) / 2;
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
+  const { colors: C } = useTheme();
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
@@ -55,16 +57,16 @@ export default function SearchScreen() {
   function renderProduct({ item }: { item: any }) {
     return (
       <Pressable
-        style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.9 }]}
+        style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.9 }, { backgroundColor: C.surface, borderColor: C.borderLight }]}
         onPress={() =>
           router.push({ pathname: "/product/[id]", params: { id: item.id.toString() } })
         }
       >
-        <View style={styles.productImageContainer}>
+        <View style={[styles.productImageContainer, { backgroundColor: C.surface }]}>
           <Image source={{ uri: getImageUrl(item.image) }} style={styles.productImage} />
         </View>
         <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={2}>
+          <Text style={[styles.productName, { color: C.text }]} numberOfLines={2}>
             {item.name}
           </Text>
           <Text style={styles.productPrice}>
@@ -76,23 +78,23 @@ export default function SearchScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
+    <View style={[styles.container, { paddingTop: insets.top + webTopInset, backgroundColor: C.background }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Explore</Text>
+        <Text style={[styles.headerTitle, { color: C.text }]}>Explore</Text>
       </View>
 
-      <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={Colors.textLight} />
+      <View style={[styles.searchBar, { backgroundColor: C.surface, borderColor: C.border }]}>
+        <Ionicons name="search" size={18} color={C.textLight} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: C.text }]}
           placeholder="Search garments..."
-          placeholderTextColor={Colors.textLight}
+          placeholderTextColor={C.textLight}
           value={search}
           onChangeText={setSearch}
         />
         {search.length > 0 && (
           <Pressable onPress={() => setSearch("")}>
-            <Ionicons name="close-circle" size={18} color={Colors.textLight} />
+            <Ionicons name="close-circle" size={18} color={C.textLight} />
           </Pressable>
         )}
       </View>
@@ -100,23 +102,24 @@ export default function SearchScreen() {
       {categories && categories.length > 0 && (
         <View style={styles.categoryFilter}>
           <Pressable
-            style={[styles.filterChip, !activeCategory && styles.filterChipActive]}
+            style={[styles.filterChip, !activeCategory && styles.filterChipActive, !activeCategory && {}, { backgroundColor: !activeCategory ? Colors.accent : C.surface, borderColor: !activeCategory ? Colors.accent : C.border }]}
             onPress={() => setActiveCategory(null)}
           >
-            <Text style={[styles.filterChipText, !activeCategory && styles.filterChipTextActive]}>
+            <Text style={[styles.filterChipText, !activeCategory && styles.filterChipTextActive, !activeCategory && { color: Colors.white }, { color: !activeCategory ? Colors.white : C.text }]}>
               All
             </Text>
           </Pressable>
           {categories.map((cat: any) => (
             <Pressable
               key={cat.id}
-              style={[styles.filterChip, activeCategory === cat.id && styles.filterChipActive]}
+              style={[styles.filterChip, activeCategory === cat.id && styles.filterChipActive, { backgroundColor: activeCategory === cat.id ? Colors.accent : C.surface, borderColor: activeCategory === cat.id ? Colors.accent : C.border }]}
               onPress={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
             >
               <Text
                 style={[
                   styles.filterChipText,
                   activeCategory === cat.id && styles.filterChipTextActive,
+                  { color: activeCategory === cat.id ? Colors.white : C.text }
                 ]}
               >
                 {cat.name}
@@ -128,12 +131,12 @@ export default function SearchScreen() {
 
       {isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.accent} />
+          <ActivityIndicator size="large" color={C.accent} />
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="search-outline" size={48} color={Colors.textLight} />
-          <Text style={styles.emptyText}>No products found</Text>
+          <Ionicons name="search-outline" size={48} color={C.textLight} />
+          <Text style={[styles.emptyText, { color: C.textSecondary }]}>No products found</Text>
         </View>
       ) : (
         <FlatList

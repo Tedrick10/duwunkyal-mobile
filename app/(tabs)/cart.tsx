@@ -17,12 +17,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import { useTheme } from "@/lib/theme-context";
 import { apiRequest, queryClient, getImageUrl } from "@/lib/query-client";
 
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const { user } = useAuth();
+  const { colors: C } = useTheme();
 
   const { data: cartItems, isLoading } = useQuery<any[]>({
     queryKey: ["/api/cart"],
@@ -64,12 +66,12 @@ export default function CartScreen() {
 
   if (!user) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
+      <View style={[styles.container, { paddingTop: insets.top + webTopInset, backgroundColor: C.background }]}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Cart</Text>
         </View>
         <View style={styles.center}>
-          <Ionicons name="bag-outline" size={56} color={Colors.textLight} />
+          <Ionicons name="bag-outline" size={56} color={C.textLight} />
           <Text style={styles.emptyTitle}>Sign in to view your cart</Text>
           <Pressable
             style={styles.signInBtn}
@@ -84,7 +86,7 @@ export default function CartScreen() {
 
   function renderCartItem({ item }: { item: any }) {
     return (
-      <View style={styles.cartItem}>
+      <View style={[styles.cartItem, { backgroundColor: C.surface, borderColor: C.borderLight }]}>
         <Pressable
           onPress={() =>
             router.push({
@@ -93,14 +95,14 @@ export default function CartScreen() {
             })
           }
         >
-          <Image source={{ uri: getImageUrl(item.product.image) }} style={styles.cartItemImage} />
+          <Image source={{ uri: getImageUrl(item.product.image) }} style={[styles.cartItemImage, { backgroundColor: C.surface }]} />
         </Pressable>
         <View style={styles.cartItemInfo}>
-          <Text style={styles.cartItemName} numberOfLines={2}>
+          <Text style={[styles.cartItemName, { color: C.text }]} numberOfLines={2}>
             {item.product.name}
           </Text>
           {(item.size || item.color) && (
-            <Text style={styles.cartItemVariant}>
+            <Text style={[styles.cartItemVariant, { color: C.textSecondary }]}>
               {[item.size, item.color].filter(Boolean).join(" / ")}
             </Text>
           )}
@@ -109,45 +111,45 @@ export default function CartScreen() {
           </Text>
           <View style={styles.qtyRow}>
             <Pressable
-              style={styles.qtyBtn}
+              style={[styles.qtyBtn, { backgroundColor: C.surfaceSecondary }]}
               onPress={() => handleQuantity(item, -1)}
             >
-              <Ionicons name="remove" size={16} color={Colors.text} />
+              <Ionicons name="remove" size={16} color={C.text} />
             </Pressable>
-            <Text style={styles.qtyText}>{item.quantity}</Text>
+            <Text style={[styles.qtyText, { color: C.text }]}>{item.quantity}</Text>
             <Pressable
-              style={styles.qtyBtn}
+              style={[styles.qtyBtn, { backgroundColor: C.surfaceSecondary }]}
               onPress={() => handleQuantity(item, 1)}
             >
-              <Ionicons name="add" size={16} color={Colors.text} />
+              <Ionicons name="add" size={16} color={C.text} />
             </Pressable>
           </View>
         </View>
         <Pressable style={styles.removeBtn} onPress={() => handleRemove(item.id)}>
-          <Ionicons name="close" size={18} color={Colors.textLight} />
+          <Ionicons name="close" size={18} color={C.textLight} />
         </Pressable>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
+    <View style={[styles.container, { paddingTop: insets.top + webTopInset, backgroundColor: C.background }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cart</Text>
+        <Text style={[styles.headerTitle, { color: C.text }]}>Cart</Text>
         {cartItems && cartItems.length > 0 && (
-          <Text style={styles.itemCount}>{cartItems.length} items</Text>
+          <Text style={[styles.itemCount, { color: C.textSecondary }]}>{cartItems.length} items</Text>
         )}
       </View>
 
       {isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.accent} />
+          <ActivityIndicator size="large" color={C.accent} />
         </View>
       ) : !cartItems || cartItems.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="bag-outline" size={56} color={Colors.textLight} />
-          <Text style={styles.emptyTitle}>Your cart is empty</Text>
-          <Text style={styles.emptySubtitle}>Start adding items to your cart</Text>
+          <Ionicons name="bag-outline" size={56} color={C.textLight} />
+          <Text style={[styles.emptyTitle, { color: C.text }]}>Your cart is empty</Text>
+          <Text style={[styles.emptySubtitle, { color: C.textSecondary }]}>Start adding items to your cart</Text>
         </View>
       ) : (
         <>
@@ -158,10 +160,10 @@ export default function CartScreen() {
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
-          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 80 }]}>
+          <View style={[styles.bottomBar, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 80, backgroundColor: C.surface, borderTopColor: C.border }]}>
             <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+              <Text style={[styles.totalLabel, { color: C.textSecondary }]}>Total</Text>
+              <Text style={[styles.totalValue, { color: C.text }]}>${total.toFixed(2)}</Text>
             </View>
             <Pressable
               style={({ pressed }) => [styles.checkoutBtn, pressed && { opacity: 0.9 }]}
