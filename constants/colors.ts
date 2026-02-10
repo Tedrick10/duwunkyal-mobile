@@ -1,4 +1,4 @@
-const Colors = {
+const LightColors = {
   primary: "#1a1a2e",
   secondary: "#16213e",
   accent: "#e94560",
@@ -18,6 +18,32 @@ const Colors = {
   black: "#000000",
   overlay: "rgba(0,0,0,0.5)",
   cardShadow: "rgba(0,0,0,0.06)",
+};
+
+const DarkColors = {
+  primary: "#e8e8f0",
+  secondary: "#c0c8d8",
+  accent: "#e94560",
+  accentLight: "#ff6b81",
+  background: "#0f0f14",
+  surface: "#1a1a24",
+  surfaceSecondary: "#24242f",
+  text: "#e8e8f0",
+  textSecondary: "#9a9aab",
+  textLight: "#6a6a7a",
+  border: "#2a2a36",
+  borderLight: "#22222e",
+  success: "#2ecc71",
+  warning: "#f39c12",
+  error: "#e74c3c",
+  white: "#ffffff",
+  black: "#000000",
+  overlay: "rgba(0,0,0,0.7)",
+  cardShadow: "rgba(0,0,0,0.2)",
+};
+
+const Colors = {
+  ...LightColors,
   light: {
     text: "#1a1a2e",
     background: "#f8f9fa",
@@ -27,4 +53,5 @@ const Colors = {
   },
 };
 
+export { LightColors, DarkColors };
 export default Colors;
