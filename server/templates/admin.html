@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel - Garment Store</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f7;color:#1d1d1f}
+.login-container{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-box{background:#fff;border-radius:16px;padding:40px;width:100%;max-width:400px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.login-box h1{font-size:24px;margin-bottom:8px;text-align:center}
+.login-box p{color:#86868b;text-align:center;margin-bottom:24px;font-size:14px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;font-weight:600;color:#6e6e73;margin-bottom:6px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:12px 16px;border:1px solid #d2d2d7;border-radius:10px;font-size:15px;transition:border-color .2s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:#0071e3}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 24px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;border:none;transition:all .2s}
+.btn-primary{background:#0071e3;color:#fff}.btn-primary:hover{background:#0066cc}
+.btn-danger{background:#ff3b30;color:#fff}.btn-danger:hover{background:#d70015}
+.btn-success{background:#34c759;color:#fff}
+.btn-outline{background:transparent;border:1px solid #d2d2d7;color:#1d1d1f}.btn-outline:hover{background:#f5f5f7}
+.btn-sm{padding:8px 14px;font-size:13px}
+.btn-full{width:100%}
+.error-msg{color:#ff3b30;font-size:13px;margin-top:8px;text-align:center}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:240px;background:#1d1d1f;color:#fff;padding:20px 0;position:fixed;top:0;left:0;bottom:0;overflow-y:auto}
+.sidebar h2{padding:0 20px;font-size:18px;margin-bottom:24px;color:#f5f5f7}
+.sidebar-nav a{display:flex;align-items:center;padding:12px 20px;color:#a1a1a6;text-decoration:none;font-size:14px;font-weight:500;transition:all .2s;gap:10px}
+.sidebar-nav a:hover,.sidebar-nav a.active{color:#fff;background:rgba(255,255,255,.08)}
+.sidebar-nav a svg{width:20px;height:20px;flex-shrink:0}
+.main{margin-left:240px;flex:1;padding:24px 32px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.header h1{font-size:28px;font-weight:700}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+.stat-card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.stat-card .label{font-size:13px;color:#86868b;font-weight:500;margin-bottom:4px}
+.stat-card .value{font-size:28px;font-weight:700}
+.card{background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.04);margin-bottom:24px}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.card-header h2{font-size:20px;font-weight:600}
+table{width:100%;border-collapse:collapse}
+table th{text-align:left;padding:12px 16px;font-size:12px;font-weight:600;color:#86868b;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e8e8ed}
+table td{padding:12px 16px;font-size:14px;border-bottom:1px solid #f5f5f7;vertical-align:middle}
+table tr:hover{background:#fafafa}
+.product-img{width:50px;height:50px;object-fit:cover;border-radius:8px;background:#f5f5f7}
+.badge{display:inline-block;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600}
+.badge-pending{background:#fff3e0;color:#e65100}
+.badge-confirmed{background:#e3f2fd;color:#1565c0}
+.badge-shipped{background:#e8f5e9;color:#2e7d32}
+.badge-delivered{background:#f3e5f5;color:#7b1fa2}
+.badge-cancelled{background:#ffebee;color:#c62828}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:32px}
+.modal h2{font-size:22px;margin-bottom:20px}
+.modal-actions{display:flex;gap:12px;margin-top:24px;justify-content:flex-end}
+.empty{text-align:center;padding:48px 24px;color:#86868b}
+.empty svg{width:48px;height:48px;margin-bottom:12px;opacity:.4}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div id="login-page" class="login-container">
+<div class="login-box">
+<h1>Admin Login</h1>
+<p>Sign in to manage your garment store</p>
+<div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="admin@store.com"></div>
+<div class="form-group"><label>Password</label><input type="password" id="login-password" placeholder="Enter password"></div>
+<button class="btn btn-primary btn-full" onclick="adminLogin()">Sign In</button>
+<div id="login-error" class="error-msg"></div>
+</div>
+</div>
+
+<div id="admin-page" class="layout hidden">
+<aside class="sidebar">
+<h2>Garment Store</h2>
+<nav class="sidebar-nav">
+<a href="#" onclick="showSection('dashboard')" class="active" id="nav-dashboard">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+Dashboard</a>
+<a href="#" onclick="showSection('products')" id="nav-products">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h6"/><path d="M14 2h6v6"/><path d="M10 14L20 4"/></svg>
+Products</a>
+<a href="#" onclick="showSection('categories')" id="nav-categories">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6H4z"/><path d="M14 14h6v6h-6z"/></svg>
+Categories</a>
+<a href="#" onclick="showSection('orders')" id="nav-orders">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+Orders</a>
+<a href="#" onclick="showSection('users')" id="nav-users">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+Users</a>
+<a href="#" onclick="adminLogout()" style="margin-top:auto;color:#ff453a">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+Logout</a>
+</nav>
+</aside>
+
+<main class="main">
+<div id="section-dashboard">
+<div class="header"><h1>Dashboard</h1></div>
+<div class="stats-grid" id="stats-grid"></div>
+<div class="card"><div class="card-header"><h2>Recent Orders</h2></div><div id="recent-orders"></div></div>
+</div>
+
+<div id="section-products" class="hidden">
+<div class="header"><h1>Products</h1><button class="btn btn-primary" onclick="showProductModal()">Add Product</button></div>
+<div class="card"><table><thead><tr><th>Image</th><th>Name</th><th>Price</th><th>Category</th><th>Stock</th><th>Featured</th><th>Actions</th></tr></thead><tbody id="products-table"></tbody></table></div>
+</div>
+
+<div id="section-categories" class="hidden">
+<div class="header"><h1>Categories</h1><button class="btn btn-primary" onclick="showCategoryModal()">Add Category</button></div>
+<div class="card"><table><thead><tr><th>Name</th><th>Image</th><th>Actions</th></tr></thead><tbody id="categories-table"></tbody></table></div>
+</div>
+
+<div id="section-orders" class="hidden">
+<div class="header"><h1>Orders</h1></div>
+<div class="card"><table><thead><tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody id="orders-table"></tbody></table></div>
+</div>
+
+<div id="section-users" class="hidden">
+<div class="header"><h1>Users</h1></div>
+<div class="card"><table><thead><tr><th>Name</th><th>Email</th><th>Admin</th><th>Joined</th></tr></thead><tbody id="users-table"></tbody></table></div>
+</div>
+</main>
+</div>
+
+<div class="modal-overlay" id="product-modal">
+<div class="modal">
+<h2 id="product-modal-title">Add Product</h2>
+<input type="hidden" id="product-id">
+<div class="form-group"><label>Name</label><input type="text" id="product-name"></div>
+<div class="form-group"><label>Description</label><textarea id="product-desc" rows="3"></textarea></div>
+<div class="form-group"><label>Price</label><input type="number" id="product-price" step="0.01"></div>
+<div class="form-group"><label>Category</label><select id="product-category"><option value="">Select category</option></select></div>
+<div class="form-group"><label>Image URL</label><input type="text" id="product-image" placeholder="https://..."></div>
+<div class="form-group"><label>Sizes (comma separated)</label><input type="text" id="product-sizes" placeholder="S,M,L,XL"></div>
+<div class="form-group"><label>Colors (comma separated)</label><input type="text" id="product-colors" placeholder="Black,White,Navy"></div>
+<div class="form-group"><label>Stock</label><input type="number" id="product-stock" value="0"></div>
+<div class="form-group"><label><input type="checkbox" id="product-featured"> Featured Product</label></div>
+<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal('product-modal')">Cancel</button><button class="btn btn-primary" onclick="saveProduct()">Save</button></div>
+</div>
+</div>
+
+<div class="modal-overlay" id="category-modal">
+<div class="modal">
+<h2 id="category-modal-title">Add Category</h2>
+<input type="hidden" id="category-id">
+<div class="form-group"><label>Name</label><input type="text" id="category-name"></div>
+<div class="form-group"><label>Image URL</label><input type="text" id="category-image" placeholder="https://..."></div>
+<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal('category-modal')">Cancel</button><button class="btn btn-primary" onclick="saveCategory()">Save</button></div>
+</div>
+</div>
+
+<div class="modal-overlay" id="order-modal">
+<div class="modal">
+<h2>Update Order Status</h2>
+<input type="hidden" id="order-id">
+<div class="form-group"><label>Status</label>
+<select id="order-status"><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="shipped">Shipped</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option></select>
+</div>
+<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal('order-modal')">Cancel</button><button class="btn btn-primary" onclick="updateOrder()">Update</button></div>
+</div>
+</div>
+
+<script>
+const API = '';
+let categories = [];
+
+async function api(url, opts = {}) {
+  const r = await fetch(API + url, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers }, credentials: 'include' });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || r.statusText); }
+  return r.json();
+}
+
+async function adminLogin() {
+  try {
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const user = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    if (!user.isAdmin) { document.getElementById('login-error').textContent = 'Admin access required'; return; }
+    document.getElementById('login-page').classList.add('hidden');
+    document.getElementById('admin-page').classList.remove('hidden');
+    loadDashboard();
+  } catch (e) { document.getElementById('login-error').textContent = e.message; }
+}
+
+async function adminLogout() {
+  await api('/api/auth/logout', { method: 'POST' });
+  location.reload();
+}
+
+function showSection(name) {
+  document.querySelectorAll('[id^="section-"]').forEach(s => s.classList.add('hidden'));
+  document.getElementById('section-' + name).classList.remove('hidden');
+  document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+  const nav = document.getElementById('nav-' + name);
+  if (nav) nav.classList.add('active');
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'products') loadProducts();
+  if (name === 'categories') loadCategories();
+  if (name === 'orders') loadOrders();
+  if (name === 'users') loadUsers();
+}
+
+async function loadDashboard() {
+  try {
+    const stats = await api('/api/admin/stats');
+    document.getElementById('stats-grid').innerHTML = `
+      <div class="stat-card"><div class="label">Total Products</div><div class="value">${stats.totalProducts}</div></div>
+      <div class="stat-card"><div class="label">Total Orders</div><div class="value">${stats.totalOrders}</div></div>
+      <div class="stat-card"><div class="label">Total Users</div><div class="value">${stats.totalUsers}</div></div>
+      <div class="stat-card"><div class="label">Revenue</div><div class="value">$${stats.totalRevenue.toFixed(2)}</div></div>`;
+    const orders = await api('/api/admin/orders');
+    const recent = orders.slice(0, 5);
+    if (!recent.length) { document.getElementById('recent-orders').innerHTML = '<div class="empty">No orders yet</div>'; return; }
+    document.getElementById('recent-orders').innerHTML = '<table><thead><tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead><tbody>' +
+      recent.map(o => `<tr><td>#${o.id}</td><td>${o.user?.name || 'N/A'}</td><td>$${parseFloat(o.total).toFixed(2)}</td><td><span class="badge badge-${o.status}">${o.status}</span></td></tr>`).join('') + '</tbody></table>';
+  } catch (e) { console.error(e); }
+}
+
+async function loadProducts() {
+  try {
+    const [prods, cats] = await Promise.all([api('/api/products'), api('/api/categories')]);
+    categories = cats;
+    if (!prods.length) { document.getElementById('products-table').innerHTML = '<tr><td colspan="7" class="empty">No products</td></tr>'; return; }
+    document.getElementById('products-table').innerHTML = prods.map(p => {
+      const cat = cats.find(c => c.id === p.categoryId);
+      return `<tr><td><img src="${p.image || 'https://placehold.co/50x50/f5f5f7/86868b?text=No+Img'}" class="product-img"></td><td>${p.name}</td><td>$${parseFloat(p.price).toFixed(2)}</td><td>${cat?.name || '-'}</td><td>${p.stock}</td><td>${p.featured ? 'Yes' : '-'}</td><td><button class="btn btn-outline btn-sm" onclick="editProduct(${p.id})">Edit</button> <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">Delete</button></td></tr>`;
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function loadCategories() {
+  try {
+    const cats = await api('/api/categories');
+    categories = cats;
+    if (!cats.length) { document.getElementById('categories-table').innerHTML = '<tr><td colspan="3" class="empty">No categories</td></tr>'; return; }
+    document.getElementById('categories-table').innerHTML = cats.map(c =>
+      `<tr><td>${c.name}</td><td>${c.image ? '<img src="'+c.image+'" class="product-img">' : '-'}</td><td><button class="btn btn-outline btn-sm" onclick="editCategory(${c.id},'${c.name}','${c.image||''}')">Edit</button> <button class="btn btn-danger btn-sm" onclick="deleteCategory(${c.id})">Delete</button></td></tr>`
+    ).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function loadOrders() {
+  try {
+    const orders = await api('/api/admin/orders');
+    if (!orders.length) { document.getElementById('orders-table').innerHTML = '<tr><td colspan="6" class="empty">No orders</td></tr>'; return; }
+    document.getElementById('orders-table').innerHTML = orders.map(o =>
+      `<tr><td>#${o.id}</td><td>${o.user?.name || 'N/A'}</td><td>$${parseFloat(o.total).toFixed(2)}</td><td><span class="badge badge-${o.status}">${o.status}</span></td><td>${new Date(o.createdAt).toLocaleDateString()}</td><td><button class="btn btn-outline btn-sm" onclick="showOrderStatus(${o.id},'${o.status}')">Update</button></td></tr>`
+    ).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function loadUsers() {
+  try {
+    const users = await api('/api/admin/users');
+    if (!users.length) { document.getElementById('users-table').innerHTML = '<tr><td colspan="4" class="empty">No users</td></tr>'; return; }
+    document.getElementById('users-table').innerHTML = users.map(u =>
+      `<tr><td>${u.name}</td><td>${u.email}</td><td>${u.isAdmin ? 'Admin' : 'User'}</td><td>${new Date(u.createdAt).toLocaleDateString()}</td></tr>`
+    ).join('');
+  } catch (e) { console.error(e); }
+}
+
+function showProductModal(p) {
+  document.getElementById('product-modal-title').textContent = p ? 'Edit Product' : 'Add Product';
+  document.getElementById('product-id').value = p?.id || '';
+  document.getElementById('product-name').value = p?.name || '';
+  document.getElementById('product-desc').value = p?.description || '';
+  document.getElementById('product-price').value = p?.price || '';
+  document.getElementById('product-image').value = p?.image || '';
+  document.getElementById('product-sizes').value = p?.sizes || '';
+  document.getElementById('product-colors').value = p?.colors || '';
+  document.getElementById('product-stock').value = p?.stock || 0;
+  document.getElementById('product-featured').checked = p?.featured || false;
+  const sel = document.getElementById('product-category');
+  sel.innerHTML = '<option value="">Select category</option>' + categories.map(c => `<option value="${c.id}" ${p?.categoryId==c.id?'selected':''}>${c.name}</option>`).join('');
+  document.getElementById('product-modal').classList.add('show');
+}
+
+async function editProduct(id) {
+  const p = await api('/api/products/' + id);
+  showProductModal(p);
+}
+
+async function saveProduct() {
+  const id = document.getElementById('product-id').value;
+  const data = {
+    name: document.getElementById('product-name').value,
+    description: document.getElementById('product-desc').value,
+    price: document.getElementById('product-price').value,
+    image: document.getElementById('product-image').value,
+    categoryId: parseInt(document.getElementById('product-category').value) || null,
+    sizes: document.getElementById('product-sizes').value,
+    colors: document.getElementById('product-colors').value,
+    stock: parseInt(document.getElementById('product-stock').value) || 0,
+    featured: document.getElementById('product-featured').checked,
+  };
+  try {
+    if (id) await api('/api/admin/products/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    else await api('/api/admin/products', { method: 'POST', body: JSON.stringify(data) });
+    closeModal('product-modal');
+    loadProducts();
+  } catch (e) { alert(e.message); }
+}
+
+async function deleteProduct(id) {
+  if (!confirm('Delete this product?')) return;
+  await api('/api/admin/products/' + id, { method: 'DELETE' });
+  loadProducts();
+}
+
+function showCategoryModal() {
+  document.getElementById('category-modal-title').textContent = 'Add Category';
+  document.getElementById('category-id').value = '';
+  document.getElementById('category-name').value = '';
+  document.getElementById('category-image').value = '';
+  document.getElementById('category-modal').classList.add('show');
+}
+
+function editCategory(id, name, image) {
+  document.getElementById('category-modal-title').textContent = 'Edit Category';
+  document.getElementById('category-id').value = id;
+  document.getElementById('category-name').value = name;
+  document.getElementById('category-image').value = image;
+  document.getElementById('category-modal').classList.add('show');
+}
+
+async function saveCategory() {
+  const id = document.getElementById('category-id').value;
+  const data = { name: document.getElementById('category-name').value, image: document.getElementById('category-image').value || null };
+  try {
+    if (id) await api('/api/admin/categories/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    else await api('/api/admin/categories', { method: 'POST', body: JSON.stringify(data) });
+    closeModal('category-modal');
+    loadCategories();
+  } catch (e) { alert(e.message); }
+}
+
+async function deleteCategory(id) {
+  if (!confirm('Delete this category?')) return;
+  await api('/api/admin/categories/' + id, { method: 'DELETE' });
+  loadCategories();
+}
+
+function showOrderStatus(id, status) {
+  document.getElementById('order-id').value = id;
+  document.getElementById('order-status').value = status;
+  document.getElementById('order-modal').classList.add('show');
+}
+
+async function updateOrder() {
+  const id = document.getElementById('order-id').value;
+  const status = document.getElementById('order-status').value;
+  await api('/api/admin/orders/' + id + '/status', { method: 'PUT', body: JSON.stringify({ status }) });
+  closeModal('order-modal');
+  loadOrders();
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+async function checkAuth() {
+  try {
+    const user = await api('/api/auth/me');
+    if (user.isAdmin) {
+      document.getElementById('login-page').classList.add('hidden');
+      document.getElementById('admin-page').classList.remove('hidden');
+      loadDashboard();
+    }
+  } catch (e) {}
+}
+checkAuth();
+</script>
+</body>
+</html>
