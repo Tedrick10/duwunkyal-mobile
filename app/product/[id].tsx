@@ -31,6 +31,7 @@ export default function ProductDetailScreen() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [wishlisted, setWishlisted] = useState(false);
 
   const { data: product, isLoading } = useQuery<any>({
     queryKey: ["/api/products", id],
@@ -104,6 +105,19 @@ export default function ProductDetailScreen() {
       >
         <View style={styles.imageSection}>
           <Image source={{ uri: getImageUrl(product.image) }} style={styles.productImage} />
+          <Pressable
+            style={styles.wishlistBtn}
+            onPress={() => {
+              setWishlisted(!wishlisted);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            }}
+          >
+            <Ionicons
+              name={wishlisted ? "heart" : "heart-outline"}
+              size={22}
+              color={wishlisted ? Colors.accent : Colors.text}
+            />
+          </Pressable>
         </View>
 
         <View style={styles.infoSection}>
@@ -294,6 +308,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 40,
     paddingTop: 80,
+  },
+  wishlistBtn: {
+    position: "absolute",
+    bottom: 16,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
   },
   productImage: {
     width: width * 0.7,
