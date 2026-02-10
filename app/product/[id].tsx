@@ -261,7 +261,7 @@ export default function ProductDetailScreen() {
             style={({ pressed }) => [styles.customizeBtn, pressed && { opacity: 0.9 }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push({ pathname: "/customize/[id]", params: { id: id as string } });
+              router.push({ pathname: "/customize/[id]", params: { id: id as string, image: product.image } });
             }}
           >
             <MaterialCommunityIcons name="tshirt-crew-outline" size={20} color={Colors.white} />

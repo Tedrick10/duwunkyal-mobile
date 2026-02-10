@@ -14,7 +14,9 @@
   }
   </script>
   <script>
-    var isInWebView = (new URLSearchParams(window.location.search)).get('webview') === '1';
+    var urlParams = new URLSearchParams(window.location.search);
+    var isInWebView = urlParams.get('webview') === '1';
+    var productImage = urlParams.get('image') || '';
     if (isInWebView) {
       document.documentElement.classList.add('in-webview');
     }
@@ -447,7 +449,7 @@
         </div>
 
         <div class="tshirt-container" id="tshirt-container">
-          <img id="tshirt-bg" class="tshirt-bg-img" src="/assets/products/tshirt-front.png" crossorigin="anonymous" />
+          <img id="tshirt-bg" class="tshirt-bg-img" crossorigin="anonymous" />
           <div class="canvas-wrapper" id="canvas-wrapper">
             <canvas id="fabric-canvas"></canvas>
           </div>
@@ -568,6 +570,13 @@
     let tshirtColor = '#ffffff';
     let selectedTextColor = '#000000';
 
+    const defaultFrontImg = '/assets/products/tshirt-front.png';
+    const defaultBackImg = '/assets/products/tshirt-back.png';
+    const productFrontImg = productImage || defaultFrontImg;
+
+    const bgImg = document.getElementById('tshirt-bg');
+    bgImg.src = productFrontImg;
+
     const frontCanvasData = { json: null };
     const backCanvasData = { json: null };
 
@@ -672,8 +681,7 @@
       document.getElementById('view-front').classList.toggle('active', view === 'front');
       document.getElementById('view-back').classList.toggle('active', view === 'back');
 
-      const bgImg = document.getElementById('tshirt-bg');
-      bgImg.src = view === 'front' ? '/assets/products/tshirt-front.png' : '/assets/products/tshirt-back.png';
+      document.getElementById('tshirt-bg').src = view === 'front' ? productFrontImg : defaultBackImg;
 
       loadView(view);
       updateTexture();
