@@ -6,15 +6,12 @@ import {
   Platform,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 
 export default function CustomizeScreen() {
   const { id } = useLocalSearchParams();
-  const insets = useSafeAreaInsets();
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
   const webViewRef = useRef<WebView>(null);
 
   const baseUrl = getApiUrl();
@@ -34,7 +31,7 @@ export default function CustomizeScreen() {
 
   if (Platform.OS === "web") {
     return (
-      <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
+      <View style={styles.container}>
         <iframe
           src={customizeUrl}
           style={{
@@ -62,7 +59,7 @@ export default function CustomizeScreen() {
   `;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       <WebView
         ref={webViewRef}
         source={{ uri: customizeUrl }}
