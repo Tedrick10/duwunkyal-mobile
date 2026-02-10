@@ -579,10 +579,10 @@
     const CONTAINER_W = isMobile ? 320 : 500;
     const CONTAINER_H = isMobile ? 380 : 560;
     const SCALE = CONTAINER_W / 500;
-    const DESIGN_W = Math.round(240 * SCALE);
-    const DESIGN_H = Math.round(320 * SCALE);
-    const DESIGN_LEFT = Math.round(130 * SCALE);
-    const DESIGN_TOP = Math.round(80 * SCALE);
+    const DESIGN_W = CONTAINER_W;
+    const DESIGN_H = CONTAINER_H;
+    const DESIGN_LEFT = 0;
+    const DESIGN_TOP = 0;
 
     let currentView = 'front';
     let currentMode = 'design';
@@ -921,7 +921,7 @@
       ctx.drawImage(bgCanvas, 0, 0, 500, 560);
 
       const designImg = fabricCanvas.toCanvasElement();
-      ctx.drawImage(designImg, 130, 80, 240, 320);
+      ctx.drawImage(designImg, 0, 0, 500, 560);
 
       const link = document.createElement('a');
       link.download = 'tshirt-design.png';
@@ -944,9 +944,7 @@
       ctx.fillRect(0, 0, 1024, 1024);
 
       const designCanvas = fabricCanvas.toCanvasElement();
-      const sx = (1024 - 240 * 2) / 2;
-      const sy = 100;
-      ctx.drawImage(designCanvas, sx, sy, 240 * 2, 320 * 2);
+      ctx.drawImage(designCanvas, 0, 0, 1024, 1024);
 
       return texCanvas;
     }
