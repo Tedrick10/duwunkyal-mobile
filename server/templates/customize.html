@@ -598,84 +598,48 @@
     const bgCanvas = document.getElementById('tshirt-bg-canvas');
     const bgCtx = bgCanvas.getContext('2d');
 
-    let originalFrontData = null;
-    let originalBackData = null;
+    let frontImgEl = null;
+    let backImgEl = null;
 
-    function loadOriginalImage(src, callback) {
+    function loadTshirtImage(src, callback) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.onload = function() {
-        const c = document.createElement('canvas');
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
-        const ctx = c.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        callback(ctx.getImageData(0, 0, c.width, c.height));
-      };
+      img.onload = function() { callback(img); };
       img.src = src;
     }
 
-    let maxLumFront = 255;
-    let maxLumBack = 255;
-
-    function computeMaxLuminance(imageData) {
-      const src = imageData.data;
-      let maxL = 0;
-      for (let i = 0; i < src.length; i += 4) {
-        if (src[i + 3] < 10) continue;
-        const l = src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114;
-        if (l > maxL) maxL = l;
-      }
-      return maxL || 255;
-    }
-
-    function applyColorToCanvas(imageData, color) {
-      if (!imageData) return;
-      bgCanvas.width = imageData.width;
-      bgCanvas.height = imageData.height;
-
-      const tinted = bgCtx.createImageData(imageData.width, imageData.height);
-      const src = imageData.data;
-      const dst = tinted.data;
-
-      const cr = parseInt(color.slice(1, 3), 16);
-      const cg = parseInt(color.slice(3, 5), 16);
-      const cb = parseInt(color.slice(5, 7), 16);
-
-      const maxL = currentView === 'front' ? maxLumFront : maxLumBack;
-
-      for (let i = 0; i < src.length; i += 4) {
-        const a = src[i + 3];
-        if (a < 10) {
-          dst[i] = dst[i+1] = dst[i+2] = 0;
-          dst[i+3] = 0;
-          continue;
-        }
-
-        const lum = (src[i] * 0.299 + src[i+1] * 0.587 + src[i+2] * 0.114) / maxL;
-
-        dst[i]     = Math.min(255, Math.round(cr * lum));
-        dst[i + 1] = Math.min(255, Math.round(cg * lum));
-        dst[i + 2] = Math.min(255, Math.round(cb * lum));
-        dst[i + 3] = a;
-      }
-
-      bgCtx.putImageData(tinted, 0, 0);
-    }
-
     function renderTshirtBg() {
-      const data = currentView === 'front' ? originalFrontData : originalBackData;
-      applyColorToCanvas(data, tshirtColor);
+      const img = currentView === 'front' ? frontImgEl : backImgEl;
+      if (!img) return;
+
+      bgCanvas.width = img.naturalWidth;
+      bgCanvas.height = img.naturalHeight;
+      const w = bgCanvas.width;
+      const h = bgCanvas.height;
+
+      bgCtx.clearRect(0, 0, w, h);
+
+      bgCtx.globalCompositeOperation = 'source-over';
+      bgCtx.drawImage(img, 0, 0);
+
+      if (tshirtColor !== '#ffffff') {
+        bgCtx.globalCompositeOperation = 'multiply';
+        bgCtx.fillStyle = tshirtColor;
+        bgCtx.fillRect(0, 0, w, h);
+
+        bgCtx.globalCompositeOperation = 'destination-in';
+        bgCtx.drawImage(img, 0, 0);
+      }
+
+      bgCtx.globalCompositeOperation = 'source-over';
     }
 
-    loadOriginalImage(productFrontImg, function(data) {
-      originalFrontData = data;
-      maxLumFront = computeMaxLuminance(data);
+    loadTshirtImage(productFrontImg, function(img) {
+      frontImgEl = img;
       renderTshirtBg();
     });
-    loadOriginalImage(productBackImg, function(data) {
-      originalBackData = data;
-      maxLumBack = computeMaxLuminance(data);
+    loadTshirtImage(productBackImg, function(img) {
+      backImgEl = img;
     });
 
     const frontCanvasData = { json: null };
