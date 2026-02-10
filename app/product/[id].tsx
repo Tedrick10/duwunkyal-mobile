@@ -31,10 +31,31 @@ export default function ProductDetailScreen() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
-  const [wishlisted, setWishlisted] = useState(false);
 
   const { data: product, isLoading } = useQuery<any>({
     queryKey: ["/api/products", id],
+  });
+
+  const { data: wishlistStatus } = useQuery<{ inWishlist: boolean }>({
+    queryKey: ["/api/wishlist/check", id],
+    enabled: !!user,
+  });
+
+  const wishlisted = wishlistStatus?.inWishlist ?? false;
+
+  const toggleWishlistMutation = useMutation({
+    mutationFn: async () => {
+      if (wishlisted) {
+        await apiRequest("DELETE", `/api/wishlist/${id}`);
+      } else {
+        await apiRequest("POST", "/api/wishlist", { productId: parseInt(id as string) });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/wishlist/check", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    },
   });
 
   const addToCartMutation = useMutation({
@@ -108,8 +129,11 @@ export default function ProductDetailScreen() {
           <Pressable
             style={styles.wishlistBtn}
             onPress={() => {
-              setWishlisted(!wishlisted);
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              if (!user) {
+                router.push("/(auth)/login");
+                return;
+              }
+              toggleWishlistMutation.mutate();
             }}
           >
             <Ionicons
