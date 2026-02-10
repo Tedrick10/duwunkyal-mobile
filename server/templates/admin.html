@@ -134,7 +134,8 @@ Logout</a>
 <div class="form-group"><label>Description</label><textarea id="product-desc" rows="3"></textarea></div>
 <div class="form-group"><label>Price</label><input type="number" id="product-price" step="0.01"></div>
 <div class="form-group"><label>Category</label><select id="product-category"><option value="">Select category</option></select></div>
-<div class="form-group"><label>Image URL</label><input type="text" id="product-image" placeholder="https://..."></div>
+<div class="form-group"><label>Front Image URL</label><input type="text" id="product-image" placeholder="https://..."></div>
+<div class="form-group"><label>Back Image URL</label><input type="text" id="product-image-back" placeholder="https://..."></div>
 <div class="form-group"><label>Sizes (comma separated)</label><input type="text" id="product-sizes" placeholder="S,M,L,XL"></div>
 <div class="form-group"><label>Colors (comma separated)</label><input type="text" id="product-colors" placeholder="Black,White,Navy"></div>
 <div class="form-group"><label>Stock</label><input type="number" id="product-stock" value="0"></div>
@@ -270,6 +271,7 @@ function showProductModal(p) {
   document.getElementById('product-desc').value = p?.description || '';
   document.getElementById('product-price').value = p?.price || '';
   document.getElementById('product-image').value = p?.image || '';
+  document.getElementById('product-image-back').value = p?.imageBack || '';
   document.getElementById('product-sizes').value = p?.sizes || '';
   document.getElementById('product-colors').value = p?.colors || '';
   document.getElementById('product-stock').value = p?.stock || 0;
@@ -291,6 +293,7 @@ async function saveProduct() {
     description: document.getElementById('product-desc').value,
     price: document.getElementById('product-price').value,
     image: document.getElementById('product-image').value,
+    imageBack: document.getElementById('product-image-back').value || null,
     categoryId: parseInt(document.getElementById('product-category').value) || null,
     sizes: document.getElementById('product-sizes').value,
     colors: document.getElementById('product-colors').value,
