@@ -24,7 +24,6 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { getImageUrl } from "@/lib/query-client";
@@ -39,9 +38,10 @@ function BannerDot({ index, activeIndex }: { index: number; activeIndex: number 
   const dotStyle = useAnimatedStyle(() => {
     const isActive = activeIndex === index;
     return {
-      width: withTiming(isActive ? 20 : 6, { duration: 250 }),
-      opacity: withTiming(isActive ? 1 : 0.35, { duration: 250 }),
-      backgroundColor: isActive ? Colors.accent : Colors.white,
+      width: withTiming(isActive ? 10 : 10, { duration: 250 }),
+      height: withTiming(isActive ? 10 : 10, { duration: 250 }),
+      opacity: withTiming(isActive ? 1 : 0.3, { duration: 250 }),
+      backgroundColor: isActive ? "#3b6ecf" : "#b0b8c4",
     };
   });
   return <Animated.View style={[styles.dot, dotStyle]} />;
@@ -126,14 +126,6 @@ export default function HomeScreen() {
       }
     >
       <Image source={{ uri: getImageUrl(item.image) }} style={styles.heroImage} />
-      <LinearGradient
-        colors={["transparent", "rgba(0,0,0,0.65)"]}
-        style={styles.heroGradient}
-      >
-        <Text style={styles.heroLabel}>Featured</Text>
-        <Text style={styles.heroTitle}>{item.name}</Text>
-        <Text style={styles.heroPrice}>${parseFloat(item.price).toFixed(2)}</Text>
-      </LinearGradient>
     </Pressable>
   );
 
@@ -321,7 +313,7 @@ const styles = StyleSheet.create({
   },
   heroBanner: {
     width: BANNER_WIDTH,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
     height: BANNER_HEIGHT,
   },
@@ -330,43 +322,15 @@ const styles = StyleSheet.create({
     height: "100%",
     resizeMode: "cover",
   },
-  heroGradient: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
-    paddingBottom: 20,
-  },
-  heroLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.accent,
-    textTransform: "uppercase" as const,
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  heroTitle: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    color: Colors.white,
-    marginBottom: 4,
-  },
-  heroPrice: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.white,
-  },
   dotsRow: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 10,
-    gap: 5,
+    marginTop: 14,
+    gap: 8,
   },
   dot: {
-    height: 6,
-    borderRadius: 3,
+    borderRadius: 5,
   },
   categoriesRow: {
     paddingHorizontal: 20,
