@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -29,6 +29,14 @@ export default function CustomizeScreen() {
     }
   }, []);
 
+  const handleNavigationChange = useCallback((request: any) => {
+    if (request.url && request.url.startsWith("stylevault://")) {
+      router.back();
+      return false;
+    }
+    return true;
+  }, []);
+
   if (Platform.OS === "web") {
     return (
       <View style={styles.container}>
@@ -45,19 +53,6 @@ export default function CustomizeScreen() {
     );
   }
 
-  const injectedJS = `
-    (function() {
-      var backBtn = document.querySelector('.back-btn');
-      if (backBtn) {
-        backBtn.onclick = function(e) {
-          e.preventDefault();
-          window.ReactNativeWebView.postMessage('GO_BACK');
-        };
-      }
-    })();
-    true;
-  `;
-
   return (
     <View style={styles.container}>
       <WebView
@@ -67,7 +62,7 @@ export default function CustomizeScreen() {
         javaScriptEnabled
         domStorageEnabled
         startInLoadingState
-        injectedJavaScript={injectedJS}
+        onShouldStartLoadWithRequest={handleNavigationChange}
         onMessage={(event) => {
           if (event.nativeEvent.data === "GO_BACK") {
             router.back();
@@ -79,7 +74,7 @@ export default function CustomizeScreen() {
           </View>
         )}
         scalesPageToFit={false}
-        originWhitelist={["*"]}
+        originWhitelist={["*", "stylevault://*"]}
       />
     </View>
   );

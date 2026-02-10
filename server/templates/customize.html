@@ -1072,7 +1072,7 @@
 
     window.goBack = function() {
       try {
-        if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
           window.ReactNativeWebView.postMessage('GO_BACK');
           return;
         }
@@ -1083,7 +1083,7 @@
           return;
         }
       } catch(e) {}
-      window.history.back();
+      window.location.href = 'stylevault://back';
     };
 
     undoStack.push(JSON.stringify(fabricCanvas.toJSON()));
