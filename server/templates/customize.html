@@ -141,6 +141,14 @@
       width: 320px;
       height: 380px;
     }
+    .tshirt-bg-wrap {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
     .tshirt-bg-img {
       position: absolute;
       top: 0; left: 0;
@@ -148,7 +156,15 @@
       height: 100%;
       object-fit: contain;
       pointer-events: none;
-      z-index: 0;
+    }
+    .tshirt-color-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      mix-blend-mode: multiply;
+      pointer-events: none;
+      background: transparent;
     }
     .canvas-wrapper {
       position: absolute;
@@ -450,7 +466,10 @@
         </div>
 
         <div class="tshirt-container" id="tshirt-container">
-          <img id="tshirt-bg" class="tshirt-bg-img" crossorigin="anonymous" />
+          <div class="tshirt-bg-wrap">
+            <img id="tshirt-bg" class="tshirt-bg-img" crossorigin="anonymous" />
+            <div id="tshirt-color-overlay" class="tshirt-color-overlay"></div>
+          </div>
           <div class="canvas-wrapper" id="canvas-wrapper">
             <canvas id="fabric-canvas"></canvas>
           </div>
@@ -714,14 +733,11 @@
       el.classList.add('active');
       tshirtColor = color;
 
-      const bgImg = document.getElementById('tshirt-bg');
-      const container = document.getElementById('tshirt-container');
+      const overlay = document.getElementById('tshirt-color-overlay');
       if (color === '#ffffff') {
-        bgImg.style.filter = 'none';
-        container.style.background = 'transparent';
+        overlay.style.background = 'transparent';
       } else {
-        bgImg.style.filter = 'none';
-        container.style.background = 'transparent';
+        overlay.style.background = color;
       }
 
       updateTexture();
