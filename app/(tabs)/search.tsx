@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   productImageContainer: {
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: Colors.white,
     padding: 10,
     alignItems: "center",
     justifyContent: "center",

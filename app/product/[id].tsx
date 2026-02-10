@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   imageSection: {
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: Colors.white,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 40,
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: Colors.white,
     alignItems: "center",
     justifyContent: "center",
   },

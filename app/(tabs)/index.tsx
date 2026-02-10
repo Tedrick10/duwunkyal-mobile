@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderLight,
   },
   featuredImageContainer: {
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: Colors.white,
     padding: 12,
     alignItems: "center",
   },
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderLight,
   },
   productImageContainer: {
-    backgroundColor: Colors.surfaceSecondary,
+    backgroundColor: Colors.white,
     padding: 10,
     alignItems: "center",
     justifyContent: "center",
