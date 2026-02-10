@@ -1071,19 +1071,25 @@
     });
 
     window.goBack = function() {
+      var sent = false;
       try {
-        if (window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+        if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage('GO_BACK');
-          return;
+          sent = true;
         }
       } catch(e) {}
       try {
         if (window.parent && window.parent !== window) {
           window.parent.postMessage('GO_BACK', '*');
-          return;
+          sent = true;
         }
       } catch(e) {}
-      window.location.href = 'stylevault://back';
+      if (!sent) {
+        window.location.href = 'stylevault://back';
+      }
+      setTimeout(function() {
+        try { window.location.href = 'stylevault://back'; } catch(e) {}
+      }, 300);
     };
 
     undoStack.push(JSON.stringify(fabricCanvas.toJSON()));

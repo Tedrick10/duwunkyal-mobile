@@ -13,29 +13,45 @@ import { getApiUrl } from "@/lib/query-client";
 export default function CustomizeScreen() {
   const { id } = useLocalSearchParams();
   const webViewRef = useRef<WebView>(null);
+  const hasNavigatedBack = useRef(false);
 
   const baseUrl = getApiUrl();
   const customizeUrl = `${baseUrl.replace(/\/$/, "")}/customize/${id}`;
+
+  const navigateBack = useCallback(() => {
+    if (!hasNavigatedBack.current) {
+      hasNavigatedBack.current = true;
+      router.back();
+    }
+  }, []);
 
   useEffect(() => {
     if (Platform.OS === "web") {
       const handleMessage = (event: MessageEvent) => {
         if (event.data === "GO_BACK") {
-          router.back();
+          navigateBack();
         }
       };
       window.addEventListener("message", handleMessage);
       return () => window.removeEventListener("message", handleMessage);
     }
-  }, []);
+  }, [navigateBack]);
 
-  const handleNavigationChange = useCallback((request: any) => {
-    if (request.url && request.url.startsWith("stylevault://")) {
-      router.back();
+  const handleShouldStartLoad = useCallback((request: any) => {
+    const url = request.url || "";
+    if (url.startsWith("stylevault://")) {
+      navigateBack();
       return false;
     }
     return true;
-  }, []);
+  }, [navigateBack]);
+
+  const handleNavigationStateChange = useCallback((navState: any) => {
+    const url = navState.url || "";
+    if (url.startsWith("stylevault://")) {
+      navigateBack();
+    }
+  }, [navigateBack]);
 
   if (Platform.OS === "web") {
     return (
@@ -53,6 +69,38 @@ export default function CustomizeScreen() {
     );
   }
 
+  const earlyInjectedJS = `
+    window._goBackToApp = function() {
+      try { window.ReactNativeWebView.postMessage('GO_BACK'); } catch(e) {}
+      setTimeout(function() {
+        try { window.location.href = 'stylevault://back'; } catch(e) {}
+      }, 200);
+    };
+    true;
+  `;
+
+  const injectedJS = `
+    (function() {
+      var origGoBack = window.goBack;
+      window.goBack = function() {
+        try { window.ReactNativeWebView.postMessage('GO_BACK'); } catch(e) {}
+        setTimeout(function() {
+          try { window.location.href = 'stylevault://back'; } catch(e) {}
+        }, 200);
+      };
+      var btn = document.querySelector('.back-btn');
+      if (btn) {
+        btn.removeAttribute('onclick');
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          window.goBack();
+        });
+      }
+    })();
+    true;
+  `;
+
   return (
     <View style={styles.container}>
       <WebView
@@ -62,10 +110,14 @@ export default function CustomizeScreen() {
         javaScriptEnabled
         domStorageEnabled
         startInLoadingState
-        onShouldStartLoadWithRequest={handleNavigationChange}
+        allowsInlineMediaPlayback
+        injectedJavaScriptBeforeContentLoaded={earlyInjectedJS}
+        injectedJavaScript={injectedJS}
+        onShouldStartLoadWithRequest={handleShouldStartLoad}
+        onNavigationStateChange={handleNavigationStateChange}
         onMessage={(event) => {
           if (event.nativeEvent.data === "GO_BACK") {
-            router.back();
+            navigateBack();
           }
         }}
         renderLoading={() => (
