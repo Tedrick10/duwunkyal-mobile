@@ -20,7 +20,8 @@ export default function CustomizeScreen() {
   const insets = useSafeAreaInsets();
 
   const baseUrl = getApiUrl();
-  const customizeUrl = `${baseUrl.replace(/\/$/, "")}/customize/${id}`;
+  const customizeUrlBase = `${baseUrl.replace(/\/$/, "")}/customize/${id}`;
+  const customizeUrl = Platform.OS === "web" ? customizeUrlBase : `${customizeUrlBase}?webview=1`;
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -50,13 +51,7 @@ export default function CustomizeScreen() {
     );
   }
 
-  const injectedJS = `
-    (function() {
-      var topBar = document.querySelector('.top-bar');
-      if (topBar) topBar.classList.add('in-webview');
-    })();
-    true;
-  `;
+  const injectedJS = `true;`;
 
   return (
     <View style={styles.container}>

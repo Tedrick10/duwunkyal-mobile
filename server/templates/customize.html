@@ -13,6 +13,12 @@
     }
   }
   </script>
+  <script>
+    var isInWebView = (new URLSearchParams(window.location.search)).get('webview') === '1';
+    if (isInWebView) {
+      document.documentElement.classList.add('in-webview');
+    }
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
@@ -38,12 +44,12 @@
       flex-shrink: 0;
       gap: 4px;
     }
-    .top-bar.in-webview {
-      padding-top: 0;
-      min-height: 44px;
+    html.in-webview .top-bar {
+      padding-top: 0 !important;
+      min-height: 44px !important;
     }
-    .top-bar.in-webview .back-btn {
-      display: none;
+    html.in-webview .back-btn {
+      display: none !important;
     }
     .top-bar-left {
       display: flex;
