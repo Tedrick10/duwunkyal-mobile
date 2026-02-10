@@ -1,59 +1,38 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect } from "react";
 import {
   View,
   StyleSheet,
   ActivityIndicator,
   Platform,
+  TouchableOpacity,
+  Text,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
 
 export default function CustomizeScreen() {
   const { id } = useLocalSearchParams();
   const webViewRef = useRef<WebView>(null);
-  const hasNavigatedBack = useRef(false);
   const insets = useSafeAreaInsets();
 
   const baseUrl = getApiUrl();
   const customizeUrl = `${baseUrl.replace(/\/$/, "")}/customize/${id}`;
 
-  const navigateBack = useCallback(() => {
-    if (!hasNavigatedBack.current) {
-      hasNavigatedBack.current = true;
-      router.back();
-    }
-  }, []);
-
   useEffect(() => {
     if (Platform.OS === "web") {
       const handleMessage = (event: MessageEvent) => {
         if (event.data === "GO_BACK") {
-          navigateBack();
+          router.back();
         }
       };
       window.addEventListener("message", handleMessage);
       return () => window.removeEventListener("message", handleMessage);
     }
-  }, [navigateBack]);
-
-  const handleShouldStartLoad = useCallback((request: any) => {
-    const url = request.url || "";
-    if (url.startsWith("stylevault://")) {
-      navigateBack();
-      return false;
-    }
-    return true;
-  }, [navigateBack]);
-
-  const handleNavigationStateChange = useCallback((navState: any) => {
-    const url = navState.url || "";
-    if (url.startsWith("stylevault://")) {
-      navigateBack();
-    }
-  }, [navigateBack]);
+  }, []);
 
   if (Platform.OS === "web") {
     return (
@@ -71,43 +50,26 @@ export default function CustomizeScreen() {
     );
   }
 
-  const topInset = insets.top;
-
-  const earlyInjectedJS = `
-    document.documentElement.style.setProperty('--custom-top-inset', '${topInset}px');
-    true;
-  `;
-
   const injectedJS = `
     (function() {
-      document.documentElement.style.setProperty('--custom-top-inset', '${topInset}px');
-
-      window.goBack = function() {
-        try { window.ReactNativeWebView.postMessage('GO_BACK'); } catch(e) {}
-        setTimeout(function() {
-          try { window.location.href = 'stylevault://back'; } catch(e) {}
-        }, 200);
-      };
-      var btn = document.querySelector('.back-btn');
-      if (btn) {
-        var newBtn = btn.cloneNode(true);
-        newBtn.removeAttribute('onclick');
-        newBtn.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          try { window.ReactNativeWebView.postMessage('GO_BACK'); } catch(ex) {}
-          setTimeout(function() {
-            try { window.location.href = 'stylevault://back'; } catch(ex) {}
-          }, 200);
-        }, true);
-        btn.parentNode.replaceChild(newBtn, btn);
-      }
+      var topBar = document.querySelector('.top-bar');
+      if (topBar) topBar.classList.add('in-webview');
     })();
     true;
   `;
 
   return (
     <View style={styles.container}>
+      <View style={[styles.nativeHeader, { paddingTop: insets.top }]}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chevron-back" size={22} color="#fff" />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+      </View>
       <WebView
         ref={webViewRef}
         source={{ uri: customizeUrl }}
@@ -116,22 +78,15 @@ export default function CustomizeScreen() {
         domStorageEnabled
         startInLoadingState
         allowsInlineMediaPlayback
-        injectedJavaScriptBeforeContentLoaded={earlyInjectedJS}
         injectedJavaScript={injectedJS}
-        onShouldStartLoadWithRequest={handleShouldStartLoad}
-        onNavigationStateChange={handleNavigationStateChange}
-        onMessage={(event) => {
-          if (event.nativeEvent.data === "GO_BACK") {
-            navigateBack();
-          }
-        }}
+        onMessage={() => {}}
         renderLoading={() => (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color={Colors.accent} />
           </View>
         )}
         scalesPageToFit={false}
-        originWhitelist={["*", "stylevault://*"]}
+        originWhitelist={["*"]}
       />
     </View>
   );
@@ -140,7 +95,27 @@ export default function CustomizeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#1a1a2e",
+  },
+  nativeHeader: {
+    backgroundColor: "#1a1a2e",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  backText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "500",
+    marginLeft: 2,
   },
   webView: {
     flex: 1,

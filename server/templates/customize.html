@@ -33,10 +33,17 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 8px;
-      padding-top: max(env(safe-area-inset-top, 0px), var(--custom-top-inset, 0px));
-      min-height: calc(44px + max(env(safe-area-inset-top, 0px), var(--custom-top-inset, 0px)));
+      padding-top: env(safe-area-inset-top, 0px);
+      min-height: calc(44px + env(safe-area-inset-top, 0px));
       flex-shrink: 0;
       gap: 4px;
+    }
+    .top-bar.in-webview {
+      padding-top: 0;
+      min-height: 44px;
+    }
+    .top-bar.in-webview .back-btn {
+      display: none;
     }
     .top-bar-left {
       display: flex;
