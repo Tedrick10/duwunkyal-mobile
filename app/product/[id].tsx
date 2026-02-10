@@ -9,15 +9,16 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  Linking,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, queryClient, getImageUrl } from "@/lib/query-client";
+import { apiRequest, queryClient, getImageUrl, getApiUrl } from "@/lib/query-client";
 
 const { width } = Dimensions.get("window");
 
@@ -256,6 +257,23 @@ export default function ProductDetailScreen() {
               {product.stock > 0 ? `${product.stock} in stock` : "Out of stock"}
             </Text>
           </View>
+
+          <Pressable
+            style={({ pressed }) => [styles.customizeBtn, pressed && { opacity: 0.9 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              const baseUrl = getApiUrl();
+              const url = `${baseUrl}/customize/${id}`;
+              if (Platform.OS === 'web') {
+                window.open(url, '_blank');
+              } else {
+                Linking.openURL(url);
+              }
+            }}
+          >
+            <MaterialCommunityIcons name="tshirt-crew-outline" size={20} color={Colors.white} />
+            <Text style={styles.customizeBtnText}>Customize Design</Text>
+          </Pressable>
         </View>
       </ScrollView>
 
@@ -444,6 +462,23 @@ const styles = StyleSheet.create({
   stockText: {
     fontSize: 13,
     fontFamily: "Inter_500Medium",
+  },
+  customizeBtn: {
+    backgroundColor: Colors.primary,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 10,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  customizeBtnText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
   bottomBar: {
     position: "absolute",

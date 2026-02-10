@@ -302,6 +302,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.sendFile("admin.html", { root: "server/templates" });
   });
 
+  app.get("/customize/:id", (_req: Request, res: Response) => {
+    res.sendFile("customize.html", { root: "server/templates" });
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
