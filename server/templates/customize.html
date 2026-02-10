@@ -916,37 +916,45 @@
     let animationId = null;
     let miniAnimationId = null;
 
-    function createTextureFromDesign() {
+    let designPlane = null;
+    let designPlaneMaterial = null;
+    let miniDesignPlane = null;
+    let miniDesignPlaneMaterial = null;
+
+    function createDesignTexture() {
       const texCanvas = document.createElement('canvas');
-      texCanvas.width = 1024;
-      texCanvas.height = 1024;
+      texCanvas.width = 512;
+      texCanvas.height = 512;
       const ctx = texCanvas.getContext('2d');
-
-      ctx.fillStyle = tshirtColor;
-      ctx.fillRect(0, 0, 1024, 1024);
-
+      ctx.clearRect(0, 0, 512, 512);
       const designCanvas = fabricCanvas.toCanvasElement();
-      ctx.drawImage(designCanvas, 0, 0, 1024, 1024);
-
+      ctx.drawImage(designCanvas, 0, 0, 512, 512);
       return texCanvas;
     }
 
     function updateTexture() {
       if (tshirtMaterial) {
-        const texCanvas = createTextureFromDesign();
-        const tex = new THREE.CanvasTexture(texCanvas);
-        tex.flipY = false;
-        tshirtMaterial.map = tex;
         tshirtMaterial.color.set(tshirtColor);
         tshirtMaterial.needsUpdate = true;
       }
       if (miniMaterial) {
-        const texCanvas = createTextureFromDesign();
-        const tex = new THREE.CanvasTexture(texCanvas);
-        tex.flipY = false;
-        miniMaterial.map = tex;
         miniMaterial.color.set(tshirtColor);
         miniMaterial.needsUpdate = true;
+      }
+
+      const texCanvas = createDesignTexture();
+      const tex = new THREE.CanvasTexture(texCanvas);
+      tex.needsUpdate = true;
+
+      if (designPlaneMaterial) {
+        designPlaneMaterial.map = tex;
+        designPlaneMaterial.needsUpdate = true;
+      }
+      if (miniDesignPlaneMaterial) {
+        const tex2 = new THREE.CanvasTexture(createDesignTexture());
+        tex2.needsUpdate = true;
+        miniDesignPlaneMaterial.map = tex2;
+        miniDesignPlaneMaterial.needsUpdate = true;
       }
     }
 
@@ -1009,6 +1017,21 @@
         obj.position.sub(center.multiplyScalar(scale));
 
         scene.add(obj);
+
+        designPlaneMaterial = new THREE.MeshBasicMaterial({
+          transparent: true,
+          opacity: 1,
+          depthTest: true,
+          depthWrite: false,
+          side: THREE.FrontSide,
+        });
+        const planeW = size.x * scale * 0.55;
+        const planeH = size.y * scale * 0.6;
+        const planeGeo = new THREE.PlaneGeometry(planeW, planeH);
+        designPlane = new THREE.Mesh(planeGeo, designPlaneMaterial);
+        designPlane.position.set(0, obj.position.y + size.y * scale * 0.05, size.z * scale * 0.52);
+        scene.add(designPlane);
+
         updateTexture();
       });
     }
@@ -1059,6 +1082,21 @@
         obj.position.sub(center.multiplyScalar(scale));
 
         miniScene.add(obj);
+
+        miniDesignPlaneMaterial = new THREE.MeshBasicMaterial({
+          transparent: true,
+          opacity: 1,
+          depthTest: true,
+          depthWrite: false,
+          side: THREE.FrontSide,
+        });
+        const planeW = size.x * scale * 0.55;
+        const planeH = size.y * scale * 0.6;
+        const planeGeo = new THREE.PlaneGeometry(planeW, planeH);
+        miniDesignPlane = new THREE.Mesh(planeGeo, miniDesignPlaneMaterial);
+        miniDesignPlane.position.set(0, obj.position.y + size.y * scale * 0.05, size.z * scale * 0.52);
+        obj.add(miniDesignPlane);
+
         updateTexture();
         animateMini();
       });
@@ -1074,12 +1112,15 @@
 
     function updateMini3D() {
       if (miniMaterial) {
-        const texCanvas = createTextureFromDesign();
-        const tex = new THREE.CanvasTexture(texCanvas);
-        tex.flipY = false;
-        miniMaterial.map = tex;
         miniMaterial.color.set(tshirtColor);
         miniMaterial.needsUpdate = true;
+      }
+      if (miniDesignPlaneMaterial) {
+        const texCanvas = createDesignTexture();
+        const tex = new THREE.CanvasTexture(texCanvas);
+        tex.needsUpdate = true;
+        miniDesignPlaneMaterial.map = tex;
+        miniDesignPlaneMaterial.needsUpdate = true;
       }
     }
 
