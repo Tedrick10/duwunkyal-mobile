@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import { getImageUrl } from "@/lib/query-client";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48 - 12) / 2;
@@ -89,7 +90,7 @@ export default function HomeScreen() {
             style={styles.heroBanner}
             onPress={() => router.push({ pathname: "/product/[id]", params: { id: featured[0].id.toString() } })}
           >
-            <Image source={{ uri: featured[0].image }} style={styles.heroImage} />
+            <Image source={{ uri: getImageUrl(featured[0].image) }} style={styles.heroImage} />
             <LinearGradient
               colors={["transparent", "rgba(0,0,0,0.7)"]}
               style={styles.heroGradient}
@@ -114,7 +115,7 @@ export default function HomeScreen() {
                 style={({ pressed }) => [styles.categoryChip, pressed && { opacity: 0.8 }]}
                 onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat.id.toString() } })}
               >
-                {cat.image && <Image source={{ uri: cat.image }} style={styles.categoryChipImage} />}
+                {cat.image && <Image source={{ uri: getImageUrl(cat.image) }} style={styles.categoryChipImage} />}
                 <Text style={styles.categoryChipText}>{cat.name}</Text>
               </Pressable>
             ))}
@@ -136,7 +137,7 @@ export default function HomeScreen() {
                 onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
                 <View style={styles.featuredImageContainer}>
-                  <Image source={{ uri: product.image }} style={styles.featuredImage} />
+                  <Image source={{ uri: getImageUrl(product.image) }} style={styles.featuredImage} />
                 </View>
                 <Text style={styles.featuredName} numberOfLines={1}>{product.name}</Text>
                 <Text style={styles.featuredPrice}>${parseFloat(product.price).toFixed(2)}</Text>
@@ -159,7 +160,7 @@ export default function HomeScreen() {
                 onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
                 <View style={styles.productImageContainer}>
-                  <Image source={{ uri: product.image }} style={styles.productImage} />
+                  <Image source={{ uri: getImageUrl(product.image) }} style={styles.productImage} />
                 </View>
                 <View style={styles.productInfo}>
                   <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>

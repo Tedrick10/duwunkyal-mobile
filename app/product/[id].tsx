@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getImageUrl } from "@/lib/query-client";
 
 const { width } = Dimensions.get("window");
 
@@ -103,7 +103,7 @@ export default function ProductDetailScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
       >
         <View style={styles.imageSection}>
-          <Image source={{ uri: product.image }} style={styles.productImage} />
+          <Image source={{ uri: getImageUrl(product.image) }} style={styles.productImage} />
         </View>
 
         <View style={styles.infoSection}>

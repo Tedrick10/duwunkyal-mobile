@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { getImageUrl } from "@/lib/query-client";
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -84,7 +85,7 @@ export default function OrderDetailScreen() {
         {order.items?.map((item: any) => (
           <View key={item.id} style={styles.item}>
             {item.product?.image && (
-              <Image source={{ uri: item.product.image }} style={styles.itemImage} />
+              <Image source={{ uri: getImageUrl(item.product?.image) }} style={styles.itemImage} />
             )}
             <View style={styles.itemInfo}>
               <Text style={styles.itemName}>{item.product?.name || "Product"}</Text>

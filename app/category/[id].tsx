@@ -15,6 +15,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { getImageUrl } from "@/lib/query-client";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48 - 12) / 2;
@@ -42,7 +43,7 @@ export default function CategoryScreen() {
         }
       >
         <View style={styles.productImageContainer}>
-          <Image source={{ uri: item.image }} style={styles.productImage} />
+          <Image source={{ uri: getImageUrl(item.image) }} style={styles.productImage} />
         </View>
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>

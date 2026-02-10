@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getImageUrl } from "@/lib/query-client";
 
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
@@ -93,7 +93,7 @@ export default function CartScreen() {
             })
           }
         >
-          <Image source={{ uri: item.product.image }} style={styles.cartItemImage} />
+          <Image source={{ uri: getImageUrl(item.product.image) }} style={styles.cartItemImage} />
         </Pressable>
         <View style={styles.cartItemInfo}>
           <Text style={styles.cartItemName} numberOfLines={2}>
