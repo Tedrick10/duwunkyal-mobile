@@ -67,13 +67,22 @@ Preferred communication style: Simple, everyday language.
 - Path alias `@shared/*` maps to `./shared/*`
 - Path alias `@/*` maps to project root
 
-### API Communication
+### Offline/Dummy Data Mode (Current)
 
-- Client uses `lib/query-client.ts` which provides:
+- **Mode**: App runs with local dummy data — NO backend API calls for data
+- **Dummy Data**: `lib/dummy-data.ts` — Contains all categories, products, cart, orders, wishlist, and user data as static TypeScript objects
+- **Local Data Service**: `lib/local-data-service.ts` — Provides CRUD operations backed by AsyncStorage for persistence (cart, orders, wishlist changes persist across sessions)
+- **Auth**: Auto-logged-in as "Style User" — no real authentication required
+- **Query Client**: `lib/query-client.ts` — Routes all query keys and mutations to `LocalDataService` instead of network requests
+- **Image URLs**: Still resolved via `getApiUrl()` pointing to backend for serving static assets from `/assets/products/`
+- **Note**: The product customization WebView (`app/customize/[id].tsx`) still loads from backend URL
+
+### API Communication (Legacy — currently bypassed by dummy data)
+
+- Client uses `lib/query-client.ts` which previously provided:
   - `getApiUrl()` — Resolves API base URL from `EXPO_PUBLIC_DOMAIN` env var
-  - `apiRequest()` — Typed fetch wrapper with credentials and error handling
-  - `getQueryFn()` — Factory for TanStack Query fetch functions with configurable 401 behavior
-- All requests use `credentials: "include"` for session cookies
+  - `apiRequest()` — Now routes to LocalDataService instead of network
+  - `getQueryFn()` — Now returns data from LocalDataService based on queryKey routing
 
 ### Build & Development
 
