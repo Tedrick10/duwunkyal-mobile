@@ -32,10 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function checkAuth() {
     try {
-      const stored = await AsyncStorage.getItem(AUTH_KEY);
-      if (stored === "true") {
-        setUser(LocalDataService.getUser());
-      }
+      setUser(LocalDataService.getUser());
     } catch (e) {
     } finally {
       setIsLoading(false);
