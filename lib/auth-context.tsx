@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
-import { getApiUrl } from "@/lib/query-client";
-import { fetch } from "expo/fetch";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LocalDataService } from "./local-data-service";
 
 interface User {
   id: number;
@@ -20,6 +20,7 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const AUTH_KEY = "@stylevault_logged_in";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -31,13 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function checkAuth() {
     try {
-      const baseUrl = getApiUrl();
-      const res = await fetch(new URL("/api/auth/me", baseUrl).toString(), {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
+      const stored = await AsyncStorage.getItem(AUTH_KEY);
+      if (stored === "true") {
+        setUser(LocalDataService.getUser());
       }
     } catch (e) {
     } finally {
@@ -45,46 +42,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function login(email: string, password: string) {
-    const baseUrl = getApiUrl();
-    const res = await fetch(new URL("/api/auth/login", baseUrl).toString(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-      credentials: "include",
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || "Login failed");
-    }
-    const data = await res.json();
-    setUser(data);
+  async function login(_email: string, _password: string) {
+    const u = await LocalDataService.login(_email, _password);
+    await AsyncStorage.setItem(AUTH_KEY, "true");
+    setUser(u);
   }
 
-  async function register(email: string, password: string, name: string, phone?: string) {
-    const baseUrl = getApiUrl();
-    const res = await fetch(new URL("/api/auth/register", baseUrl).toString(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, name, phone }),
-      credentials: "include",
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || "Registration failed");
-    }
-    const data = await res.json();
-    setUser(data);
+  async function register(_email: string, _password: string, _name: string, _phone?: string) {
+    const u = await LocalDataService.register(_email, _password, _name, _phone);
+    await AsyncStorage.setItem(AUTH_KEY, "true");
+    setUser(u);
   }
 
   async function logout() {
-    try {
-      const baseUrl = getApiUrl();
-      await fetch(new URL("/api/auth/logout", baseUrl).toString(), {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (e) {}
+    await AsyncStorage.removeItem(AUTH_KEY);
     setUser(null);
   }
 
