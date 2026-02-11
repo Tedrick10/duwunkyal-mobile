@@ -20,7 +20,7 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const AUTH_KEY = "@stylevault_logged_in";
+const AUTH_KEY = "@duwunkyal_logged_in";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

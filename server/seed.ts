@@ -1,53 +1,118 @@
 import bcrypt from "bcryptjs";
 import { db } from "./db";
-import { users, categories, products } from "@shared/schema";
+import { users, categories, products, cartItems, orders, orderItems, wishlistItems } from "@shared/schema";
+import {
+  CATEGORIES,
+  PRODUCTS,
+  INITIAL_CART,
+  INITIAL_ORDERS,
+  INITIAL_WISHLIST,
+  DUMMY_USER,
+} from "../lib/dummy-data";
 
 async function seed() {
-  console.log("Seeding database...");
+  console.log("Seeding database with dummy data...");
 
-  const existingAdmin = await db.select().from(users);
-  if (existingAdmin.length > 0) {
+  const existingUsers = await db.select().from(users);
+  if (existingUsers.length > 0) {
     console.log("Database already seeded, skipping...");
     process.exit(0);
   }
 
-  const hashedPassword = await bcrypt.hash("admin123", 10);
+  // 1. Users: Dummy user first (id=1), then Admin
+  const dummyPassword = await bcrypt.hash("user123", 10);
+  await db.insert(users).values({
+    email: DUMMY_USER.email,
+    password: dummyPassword,
+    name: DUMMY_USER.name,
+    phone: DUMMY_USER.phone,
+    address: DUMMY_USER.address,
+    isAdmin: false,
+  });
+
+  const adminPassword = await bcrypt.hash("admin123", 10);
   await db.insert(users).values({
     email: "admin@store.com",
-    password: hashedPassword,
+    password: adminPassword,
     name: "Admin",
     isAdmin: true,
   });
 
-  const [tshirts] = await db.insert(categories).values({ name: "T-Shirts", image: "/assets/products/tshirt-front.png" }).returning();
-  const [shirts] = await db.insert(categories).values({ name: "Shirts", image: "/assets/products/tshirt-front.png" }).returning();
-  const [jeans] = await db.insert(categories).values({ name: "Jeans", image: "/assets/products/tshirt-front.png" }).returning();
-  const [dresses] = await db.insert(categories).values({ name: "Dresses", image: "/assets/products/tshirt-front.png" }).returning();
-  const [jackets] = await db.insert(categories).values({ name: "Jackets", image: "/assets/products/tshirt-front.png" }).returning();
-  const [activewear] = await db.insert(categories).values({ name: "Activewear", image: "/assets/products/tshirt-front.png" }).returning();
+  // 2. Categories (same order as dummy-data for id mapping)
+  for (const cat of CATEGORIES) {
+    await db.insert(categories).values({
+      name: cat.name,
+      image: cat.image,
+    });
+  }
 
-  const sampleProducts = [
-    { name: "Classic V-Neck Tee", description: "Premium cotton v-neck t-shirt with a modern slim fit. Perfect for casual everyday wear.", price: "29.99", image: "/assets/products/tshirt-front.png", categoryId: tshirts.id, sizes: "S,M,L,XL,XXL", colors: "Black,White,Navy,Gray", stock: 150, featured: true },
-    { name: "Crew Neck Essential", description: "Soft breathable cotton crew neck. A wardrobe staple.", price: "24.99", image: "/assets/products/tshirt-front.png", categoryId: tshirts.id, sizes: "S,M,L,XL", colors: "White,Black,Olive,Burgundy", stock: 200, featured: true },
-    { name: "Graphic Print Tee", description: "Bold graphic print on premium cotton. Stand out from the crowd.", price: "34.99", image: "/assets/products/tshirt-front.png", categoryId: tshirts.id, sizes: "S,M,L,XL", colors: "Black,White", stock: 80, featured: false },
-    { name: "Oxford Button Down", description: "Classic oxford cloth button-down shirt. Perfect for smart casual.", price: "59.99", image: "/assets/products/tshirt-front.png", categoryId: shirts.id, sizes: "S,M,L,XL,XXL", colors: "White,Light Blue,Pink", stock: 120, featured: true },
-    { name: "Linen Summer Shirt", description: "Lightweight linen shirt for warm weather. Breathable and stylish.", price: "49.99", image: "/assets/products/tshirt-front.png", categoryId: shirts.id, sizes: "S,M,L,XL", colors: "White,Beige,Sky Blue", stock: 90, featured: false },
-    { name: "Flannel Check Shirt", description: "Warm flannel shirt with classic check pattern.", price: "54.99", image: "/assets/products/tshirt-front.png", categoryId: shirts.id, sizes: "M,L,XL,XXL", colors: "Red,Green,Blue", stock: 60, featured: false },
-    { name: "Slim Fit Denim", description: "Modern slim fit jeans in premium stretch denim.", price: "69.99", image: "/assets/products/tshirt-front.png", categoryId: jeans.id, sizes: "28,30,32,34,36", colors: "Dark Blue,Black,Light Wash", stock: 100, featured: true },
-    { name: "Straight Leg Classic", description: "Timeless straight leg jeans. Comfortable all-day wear.", price: "64.99", image: "/assets/products/tshirt-front.png", categoryId: jeans.id, sizes: "28,30,32,34,36,38", colors: "Medium Wash,Dark Wash", stock: 130, featured: false },
-    { name: "Floral Midi Dress", description: "Elegant floral print midi dress for any occasion.", price: "79.99", image: "/assets/products/tshirt-front.png", categoryId: dresses.id, sizes: "XS,S,M,L,XL", colors: "Floral Blue,Floral Pink", stock: 70, featured: true },
-    { name: "Little Black Dress", description: "Classic little black dress. A timeless essential.", price: "89.99", image: "/assets/products/tshirt-front.png", categoryId: dresses.id, sizes: "XS,S,M,L", colors: "Black", stock: 50, featured: true },
-    { name: "Leather Biker Jacket", description: "Premium leather biker jacket with classic styling.", price: "199.99", image: "/assets/products/tshirt-front.png", categoryId: jackets.id, sizes: "S,M,L,XL", colors: "Black,Brown", stock: 40, featured: true },
-    { name: "Puffer Down Jacket", description: "Warm insulated puffer jacket for cold weather.", price: "149.99", image: "/assets/products/tshirt-front.png", categoryId: jackets.id, sizes: "S,M,L,XL,XXL", colors: "Black,Navy,Olive", stock: 65, featured: false },
-    { name: "Performance Leggings", description: "High-waist performance leggings with moisture-wicking fabric.", price: "44.99", image: "/assets/products/tshirt-front.png", categoryId: activewear.id, sizes: "XS,S,M,L,XL", colors: "Black,Navy,Gray", stock: 180, featured: false },
-    { name: "Training Tank Top", description: "Lightweight training tank with breathable mesh panels.", price: "29.99", image: "/assets/products/tshirt-front.png", categoryId: activewear.id, sizes: "S,M,L,XL", colors: "Black,White,Red", stock: 140, featured: false },
-  ];
+  // 3. Products (categoryId 1-6 maps to inserted categories)
+  for (const p of PRODUCTS) {
+    await db.insert(products).values({
+      name: p.name,
+      description: p.description,
+      price: p.price,
+      image: p.image,
+      imageBack: p.imageBack,
+      categoryId: p.categoryId,
+      sizes: p.sizes,
+      colors: p.colors,
+      stock: p.stock,
+      featured: p.featured,
+    });
+  }
 
-  for (const p of sampleProducts) {
-    await db.insert(products).values(p);
+  // 4. Cart items for user 1
+  for (const item of INITIAL_CART) {
+    await db.insert(cartItems).values({
+      userId: 1,
+      productId: item.productId,
+      quantity: item.quantity,
+      size: item.size,
+      color: item.color,
+    });
+  }
+
+  // 5. Orders and order items for user 1
+  for (const order of INITIAL_ORDERS) {
+    const [insertedOrder] = await db
+      .insert(orders)
+      .values({
+        userId: 1,
+        total: order.total,
+        status: order.status,
+        shippingAddress: order.shippingAddress,
+      })
+      .returning();
+    if (insertedOrder) {
+      for (const oi of order.items) {
+        await db.insert(orderItems).values({
+          orderId: insertedOrder.id,
+          productId: oi.productId,
+          quantity: oi.quantity,
+          price: oi.price,
+          size: oi.size,
+          color: oi.color,
+        });
+      }
+    }
+  }
+
+  // 6. Wishlist items for user 1
+  for (const item of INITIAL_WISHLIST) {
+    await db.insert(wishlistItems).values({
+      userId: 1,
+      productId: item.productId,
+    });
   }
 
   console.log("Seeding complete!");
+  console.log("  - Users: Style User (user@duwunkyal.com / user123), Admin (admin@store.com / admin123)");
+  console.log("  - Categories:", CATEGORIES.length);
+  console.log("  - Products:", PRODUCTS.length);
+  console.log("  - Cart items:", INITIAL_CART.length);
+  console.log("  - Orders:", INITIAL_ORDERS.length);
+  console.log("  - Wishlist items:", INITIAL_WISHLIST.length);
   process.exit(0);
 }
 

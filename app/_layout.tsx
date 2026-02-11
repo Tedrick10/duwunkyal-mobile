@@ -5,6 +5,7 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CustomSplashScreen } from "@/components/CustomSplashScreen";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
@@ -68,7 +69,13 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) return null;
+  useEffect(() => {
+    if (!fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return <CustomSplashScreen />;
 
   return (
     <ErrorBoundary>

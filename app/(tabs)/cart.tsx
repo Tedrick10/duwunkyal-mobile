@@ -15,10 +15,10 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import Colors from "@/constants/colors";
+import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
-import { apiRequest, queryClient, getImageUrl } from "@/lib/query-client";
+import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-client";
 
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
@@ -95,7 +95,7 @@ export default function CartScreen() {
             })
           }
         >
-          <Image source={{ uri: getImageUrl(item.product.image) }} style={[styles.cartItemImage, { backgroundColor: C.surface }]} />
+          <Image source={getProductImageSource(item.product.image)} style={[styles.cartItemImage, { backgroundColor: C.productImageBg }]} />
         </Pressable>
         <View style={styles.cartItemInfo}>
           <Text style={[styles.cartItemName, { color: C.text }]} numberOfLines={2}>
@@ -144,6 +144,7 @@ export default function CartScreen() {
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={C.accent} />
+          <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: C.textSecondary }}>Loading...</Text>
         </View>
       ) : !cartItems || cartItems.length === 0 ? (
         <View style={styles.center}>
@@ -226,17 +227,18 @@ const styles = StyleSheet.create({
   cartItem: {
     flexDirection: "row",
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: Colors.borderLight,
+    ...cardShadow,
   },
   cartItemImage: {
     width: 80,
     height: 80,
-    borderRadius: 10,
-    backgroundColor: Colors.white,
+    borderRadius: 12,
+    backgroundColor: Colors.productImageBg,
     resizeMode: "contain",
   },
   cartItemInfo: { flex: 1, marginLeft: 12, justifyContent: "center" },
@@ -293,13 +295,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 18,
+    ...cardShadow,
   },
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 14,
   },
   totalLabel: {
     fontSize: 16,
@@ -316,9 +319,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
-    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    minHeight: 52,
+    borderRadius: 14,
     gap: 8,
+    ...cardShadow,
   },
   checkoutBtnText: {
     color: Colors.white,

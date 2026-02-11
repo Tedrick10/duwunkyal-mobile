@@ -34,8 +34,10 @@ function NativeTabLayout() {
 
 function ClassicTabLayout() {
   const { isDark, colors: C } = useTheme();
+  const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === "web";
   const isIOS = Platform.OS === "ios";
+  const tabBarBottom = Math.max(insets.bottom, 12);
 
   return (
     <Tabs
@@ -49,7 +51,8 @@ function ClassicTabLayout() {
           borderTopWidth: isWeb ? 1 : 0,
           borderTopColor: C.border,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          paddingBottom: tabBarBottom,
+          height: (isWeb ? 84 : 56) + tabBarBottom,
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -67,9 +70,10 @@ function ClassicTabLayout() {
             />
           ) : null,
         tabBarLabelStyle: {
-          fontFamily: "Inter_500Medium",
+          fontFamily: "Inter_600SemiBold",
           fontSize: 11,
         },
+        tabBarItemStyle: { paddingVertical: 4 },
       }}
     >
       <Tabs.Screen

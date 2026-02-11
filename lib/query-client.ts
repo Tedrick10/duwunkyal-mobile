@@ -1,10 +1,96 @@
+import type { ImageSourcePropType } from "react-native";
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { LocalDataService } from "./local-data-service";
 
+const DEFAULT_PRODUCT_IMAGE = require("../assets/products/tshirt-default.png");
+
+/** Color t-shirt images for product listings (random-looking but stable per product id). */
+const PRODUCT_LISTING_IMAGES: ImageSourcePropType[] = [
+  require("../assets/products/tshirt-color-white.png"),
+  require("../assets/products/tshirt-color-black.png"),
+  require("../assets/products/tshirt-color-green.png"),
+  require("../assets/products/tshirt-color-blue.png"),
+  require("../assets/products/tshirt-color-red.png"),
+  require("../assets/products/tshirt-color-navy.png"),
+  require("../assets/products/tshirt-color-yellow.png"),
+  require("../assets/products/tshirt-color-pink.png"),
+  require("../assets/products/tshirt-color-orange.png"),
+  require("../assets/products/tshirt-color-grey.png"),
+  require("../assets/products/tshirt-color-brown.png"),
+];
+
+/** Color names in same order as PRODUCT_LISTING_IMAGES (for default selection on product details). */
+const LISTING_COLOR_NAMES = [
+  "White", "Black", "Green", "Blue", "Red", "Navy", "Yellow", "Pink", "Orange", "Grey", "Brown",
+];
+
+/** Returns a stable "random" product image for listings based on product id. */
+export function getListingProductImageSource(productId: number): ImageSourcePropType {
+  const id = typeof productId === "number" ? productId : parseInt(String(productId), 10) || 0;
+  const index = Math.abs(id) % PRODUCT_LISTING_IMAGES.length;
+  return PRODUCT_LISTING_IMAGES[index];
+}
+
+/** Returns the color name shown for this product on the listing (for default on product details). */
+export function getListingColorForProductId(productId: number): string | null {
+  const id = typeof productId === "number" ? productId : parseInt(String(productId), 10) || 0;
+  const index = Math.abs(id) % LISTING_COLOR_NAMES.length;
+  return LISTING_COLOR_NAMES[index];
+}
+
+/** T-shirt images by color (for listing and details). Gray maps to Grey. */
+const TSHIRT_COLOR_IMAGES: Record<string, ImageSourcePropType> = {
+  White: require("../assets/products/tshirt-color-white.png"),
+  Black: require("../assets/products/tshirt-color-black.png"),
+  Green: require("../assets/products/tshirt-color-green.png"),
+  Blue: require("../assets/products/tshirt-color-blue.png"),
+  Red: require("../assets/products/tshirt-color-red.png"),
+  Navy: require("../assets/products/tshirt-color-navy.png"),
+  Yellow: require("../assets/products/tshirt-color-yellow.png"),
+  Pink: require("../assets/products/tshirt-color-pink.png"),
+  Orange: require("../assets/products/tshirt-color-orange.png"),
+  Grey: require("../assets/products/tshirt-color-grey.png"),
+  Brown: require("../assets/products/tshirt-color-brown.png"),
+};
+
+/** Returns t-shirt image for a color name (case-insensitive; Gray → Grey). */
+export function getTshirtImageForColor(colorName: string): ImageSourcePropType | null {
+  const key = (colorName || "").trim();
+  const lower = key.toLowerCase();
+  if (lower === "gray") return TSHIRT_COLOR_IMAGES.Grey;
+  const found = Object.keys(TSHIRT_COLOR_IMAGES).find((k) => k.toLowerCase() === lower);
+  return found ? TSHIRT_COLOR_IMAGES[found] : null;
+}
+
+/** Listing image and color from product’s actual colors so list and details match. */
+export function getListingImageAndColor(product: {
+  id: number;
+  colors?: string | null;
+}): { imageSource: ImageSourcePropType; color: string | null } {
+  const colors = product.colors
+    ? product.colors.split(",").map((c: string) => c.trim()).filter(Boolean)
+    : [];
+  if (colors.length === 0) {
+    return { imageSource: getListingProductImageSource(product.id), color: null };
+  }
+  const id = typeof product.id === "number" ? product.id : parseInt(String(product.id), 10) || 0;
+  const index = Math.abs(id) % colors.length;
+  const chosenColor = colors[index];
+  const imageSource = getTshirtImageForColor(chosenColor) ?? getListingProductImageSource(product.id);
+  return { imageSource, color: chosenColor };
+}
+
 export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
-  if (!host) return "https://localhost:5000";
-  return new URL(`https://${host}`).href;
+  if (!host || host === "undefined" || host === "null") return "http://localhost:5000";
+  const protocol = host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https";
+  return `${protocol}://${host}`;
+}
+
+export function getProductImageSource(path: string | null | undefined): ImageSourcePropType {
+  if (!path) return DEFAULT_PRODUCT_IMAGE;
+  if (path.includes("tshirt-default.png")) return DEFAULT_PRODUCT_IMAGE;
+  return { uri: getImageUrl(path) };
 }
 
 export async function apiRequest(
@@ -57,60 +143,60 @@ export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const route = queryKey.join("/");
+    async ({ queryKey }) => {
+      const route = queryKey.join("/");
 
-    if (route === "/api/auth/me") {
-      return LocalDataService.getUser() as any;
-    }
+      if (route === "/api/auth/me") {
+        return LocalDataService.getUser() as any;
+      }
 
-    if (route === "/api/categories") {
-      return LocalDataService.getCategories() as any;
-    }
+      if (route === "/api/categories") {
+        return LocalDataService.getCategories() as any;
+      }
 
-    if (route === "/api/products") {
-      return LocalDataService.getProducts() as any;
-    }
+      if (route === "/api/products") {
+        return LocalDataService.getProducts() as any;
+      }
 
-    if (route === "/api/products/featured") {
-      return LocalDataService.getFeaturedProducts() as any;
-    }
+      if (route === "/api/products/featured") {
+        return LocalDataService.getFeaturedProducts() as any;
+      }
 
-    if (route.match(/^\/api\/products\/category\/\d+$/)) {
-      const catId = parseInt(route.split("/").pop()!);
-      return LocalDataService.getProductsByCategory(catId) as any;
-    }
+      if (route.match(/^\/api\/products\/category\/\d+$/)) {
+        const catId = parseInt(route.split("/").pop()!);
+        return LocalDataService.getProductsByCategory(catId) as any;
+      }
 
-    if (route.match(/^\/api\/products\/\d+$/)) {
-      const id = parseInt(route.split("/").pop()!);
-      return (LocalDataService.getProductById(id) || null) as any;
-    }
+      if (route.match(/^\/api\/products\/\d+$/)) {
+        const id = parseInt(route.split("/").pop()!);
+        return (LocalDataService.getProductById(id) || null) as any;
+      }
 
-    if (route === "/api/cart") {
-      return (await LocalDataService.getCart()) as any;
-    }
+      if (route === "/api/cart") {
+        return (await LocalDataService.getCart()) as any;
+      }
 
-    if (route === "/api/orders") {
-      return (await LocalDataService.getOrders()) as any;
-    }
+      if (route === "/api/orders") {
+        return (await LocalDataService.getOrders()) as any;
+      }
 
-    if (route.match(/^\/api\/orders\/\d+$/)) {
-      const id = parseInt(route.split("/").pop()!);
-      return ((await LocalDataService.getOrderById(id)) || null) as any;
-    }
+      if (route.match(/^\/api\/orders\/\d+$/)) {
+        const id = parseInt(route.split("/").pop()!);
+        return ((await LocalDataService.getOrderById(id)) || null) as any;
+      }
 
-    if (route === "/api/wishlist") {
-      return (await LocalDataService.getWishlist()) as any;
-    }
+      if (route === "/api/wishlist") {
+        return (await LocalDataService.getWishlist()) as any;
+      }
 
-    if (route.match(/^\/api\/wishlist\/check\/\d+$/)) {
-      const productId = parseInt(route.split("/").pop()!);
-      const inWishlist = await LocalDataService.isInWishlist(productId);
-      return { inWishlist } as any;
-    }
+      if (route.match(/^\/api\/wishlist\/check\/\d+$/)) {
+        const productId = parseInt(route.split("/").pop()!);
+        const inWishlist = await LocalDataService.isInWishlist(productId);
+        return { inWishlist } as any;
+      }
 
-    return null as any;
-  };
+      return null as any;
+    };
 
 export function getImageUrl(path: string | null | undefined): string {
   if (!path) return "";
@@ -121,6 +207,22 @@ export function getImageUrl(path: string | null | undefined): string {
   } catch {
     return path;
   }
+}
+
+const CATEGORY_IMAGES: Record<string, ImageSourcePropType> = {
+  "/assets/products/cat-tshirts.png": require("../assets/products/cat-tshirts.png"),
+  "/assets/products/cat-shirts.png": require("../assets/products/cat-shirts.png"),
+  "/assets/products/cat-jeans.png": require("../assets/products/cat-jeans.png"),
+  "/assets/products/cat-dresses.png": require("../assets/products/cat-dresses.png"),
+  "/assets/products/cat-jackets.png": require("../assets/products/cat-jackets.png"),
+  "/assets/products/cat-activewear.png": require("../assets/products/cat-activewear.png"),
+};
+
+export function getCategoryImageSource(path: string | null | undefined): ImageSourcePropType {
+  if (!path) return DEFAULT_PRODUCT_IMAGE;
+  const local = CATEGORY_IMAGES[path];
+  if (local) return local;
+  return { uri: getImageUrl(path) };
 }
 
 export const queryClient = new QueryClient({

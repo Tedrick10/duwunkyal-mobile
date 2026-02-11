@@ -15,11 +15,11 @@ import {
 } from "./dummy-data";
 
 const STORAGE_KEYS = {
-  CART: "@stylevault_cart",
-  ORDERS: "@stylevault_orders",
-  WISHLIST: "@stylevault_wishlist",
-  USER: "@stylevault_user",
-  LOGGED_IN: "@stylevault_logged_in",
+  CART: "@duwunkyaw_cart",
+  ORDERS: "@duwunkyaw_orders",
+  WISHLIST: "@duwunkyaw_wishlist",
+  USER: "@duwunkyaw_user",
+  LOGGED_IN: "@duwunkyaw_logged_in",
 };
 
 let _cart: CartItemData[] | null = null;

@@ -190,7 +190,7 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: C.text }]}>Appearance</Text>
-        <View style={[styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }]}>
+        {/* <View style={[styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }]}>
           <Ionicons name={isDark ? "moon" : "sunny-outline"} size={22} color={C.accent} />
           <Text style={[styles.menuItemText, { color: C.text, flex: 1 }]}>Dark Mode</Text>
           <Switch
@@ -202,7 +202,7 @@ export default function ProfileScreen() {
             trackColor={{ false: C.border, true: C.accent }}
             thumbColor={Colors.white}
           />
-        </View>
+        </View> */}
       </View>
 
       <View style={styles.section}>

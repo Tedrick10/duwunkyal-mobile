@@ -12,7 +12,7 @@ interface ThemeContextValue {
   setTheme: (mode: ThemeMode) => void;
 }
 
-const THEME_KEY = "@stylevault_theme";
+const THEME_KEY = "@duwunkyal_theme";
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 

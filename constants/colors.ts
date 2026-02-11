@@ -18,6 +18,7 @@ const LightColors = {
   black: "#000000",
   overlay: "rgba(0,0,0,0.5)",
   cardShadow: "rgba(0,0,0,0.06)",
+  productImageBg: "#f5f5f5",
 };
 
 const DarkColors = {
@@ -40,6 +41,16 @@ const DarkColors = {
   black: "#000000",
   overlay: "rgba(0,0,0,0.7)",
   cardShadow: "rgba(0,0,0,0.2)",
+  productImageBg: "#2a2a36",
+};
+
+/** Card shadow for iOS/Android (use with StyleSheet or spread). */
+export const cardShadow = {
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  elevation: 3,
 };
 
 const Colors = {

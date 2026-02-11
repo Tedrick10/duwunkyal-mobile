@@ -63,7 +63,7 @@ export default function RegisterScreen() {
             <Ionicons name="person-add-outline" size={36} color={Colors.accent} />
           </View>
           <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join StyleVault today</Text>
+          <Text style={styles.subtitle}>Join DUWUN KYAL today</Text>
         </View>
 
         <View style={styles.form}>

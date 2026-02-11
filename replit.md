@@ -1,8 +1,8 @@
-# StyleVault
+# Duwunkyal
 
 ## Overview
 
-StyleVault is a full-stack mobile e-commerce application for a garment/clothing store. It uses **Expo (React Native)** for the frontend and **Express.js** for the backend API, with **PostgreSQL** as the database via **Drizzle ORM**. The app supports browsing products by category, searching, cart management, checkout with order placement, user authentication, an admin panel for store management, and a **product customization editor** with 2D design (fabric.js) and 3D preview (three.js).
+Duwunkyal is a full-stack mobile e-commerce application for a garment/clothing store. It uses **Expo (React Native)** for the frontend and **Express.js** for the backend API, with **PostgreSQL** as the database via **Drizzle ORM**. The app supports browsing products by category, searching, cart management, checkout with order placement, user authentication, an admin panel for store management, and a **product customization editor** with 2D design (fabric.js) and 3D preview (three.js).
 
 ## User Preferences
 

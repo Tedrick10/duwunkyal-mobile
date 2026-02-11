@@ -16,7 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, queryClient, getImageUrl } from "@/lib/query-client";
+import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-client";
 
 export default function WishlistScreen() {
   const insets = useSafeAreaInsets();
@@ -83,7 +83,7 @@ export default function WishlistScreen() {
         }
       >
         <Image
-          source={{ uri: getImageUrl(item.product.image) }}
+          source={getProductImageSource(item.product.image)}
           style={styles.itemImage}
         />
         <View style={styles.itemInfo}>

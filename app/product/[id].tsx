@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,17 +15,42 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import Colors from "@/constants/colors";
+import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, queryClient, getImageUrl } from "@/lib/query-client";
+import { apiRequest, queryClient, getImageUrl, getProductImageSource, getTshirtImageForColor } from "@/lib/query-client";
 
 const { width } = Dimensions.get("window");
 
+/** Map color names (e.g. White, Black, Green, Blue) to hex for swatch display. */
+const COLOR_NAME_TO_HEX: Record<string, string> = {
+  White: "#ffffff",
+  Black: "#000000",
+  Green: "#2e7d32",
+  Blue: "#1976d2",
+  Red: "#c62828",
+  Navy: "#1a237e",
+  Grey: "#616161",
+  Pink: "#ad1457",
+  Yellow: "#f9a825",
+  Orange: "#ef6c00",
+  Beige: "#d7ccc8",
+  Brown: "#5d4037",
+};
+
+function getColorHex(name: string): string {
+  const key = name.trim();
+  if (key.startsWith("#")) return key;
+  const lower = key.toLowerCase();
+  const found = Object.entries(COLOR_NAME_TO_HEX).find(([k]) => k.toLowerCase() === lower);
+  return found ? found[1] : "#9e9e9e";
+}
+
 export default function ProductDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, color: paramColor } = useLocalSearchParams<{ id: string; color?: string }>();
   const insets = useSafeAreaInsets();
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const { user } = useAuth();
+  const initialColorSetRef = useRef(false);
 
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
@@ -78,6 +103,24 @@ export default function ProductDetailScreen() {
   const sizes = product?.sizes ? product.sizes.split(",").map((s: string) => s.trim()) : [];
   const colors = product?.colors ? product.colors.split(",").map((c: string) => c.trim()) : [];
 
+  useEffect(() => {
+    initialColorSetRef.current = false;
+  }, [id]);
+
+  useEffect(() => {
+    if (!product || initialColorSetRef.current || !paramColor?.trim()) return;
+    const productColors = product.colors ? product.colors.split(",").map((c: string) => c.trim()) : [];
+    const paramLower = paramColor.trim().toLowerCase();
+    const match = productColors.find(
+      (c: string) => c.trim().toLowerCase() === paramLower || (paramLower === "grey" && c.trim().toLowerCase() === "gray")
+    );
+    if (match) {
+      const canonical = match.trim().toLowerCase() === "gray" ? "Grey" : match;
+      setSelectedColor(canonical);
+      initialColorSetRef.current = true;
+    }
+  }, [product, paramColor]);
+
   function handleAddToCart() {
     if (!user) {
       router.push("/(auth)/login");
@@ -91,6 +134,7 @@ export default function ProductDetailScreen() {
       <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </View>
     );
@@ -125,7 +169,14 @@ export default function ProductDetailScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
       >
         <View style={styles.imageSection}>
-          <Image source={{ uri: getImageUrl(product.image) }} style={styles.productImage} />
+          <Image
+            source={
+              (selectedColor ? getTshirtImageForColor(selectedColor) : null) ??
+              getProductImageSource(product.image)
+            }
+            style={styles.productImage}
+            resizeMode="contain"
+          />
           <Pressable
             style={styles.wishlistBtn}
             onPress={() => {
@@ -187,29 +238,32 @@ export default function ProductDetailScreen() {
           {colors.length > 0 && (
             <View style={styles.optionSection}>
               <Text style={styles.optionLabel}>Color</Text>
-              <View style={styles.optionRow}>
-                {colors.map((color: string) => (
-                  <Pressable
-                    key={color}
-                    style={[
-                      styles.colorChip,
-                      selectedColor === color && styles.colorChipActive,
-                    ]}
-                    onPress={() => {
-                      setSelectedColor(color);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                  >
-                    <Text
+              <View style={styles.colorSwatchRow}>
+                {colors.map((color: string) => {
+                  const hex = getColorHex(color);
+                  const isSelected = selectedColor === color;
+                  return (
+                    <Pressable
+                      key={color}
                       style={[
-                        styles.colorChipText,
-                        selectedColor === color && styles.colorChipTextActive,
+                        styles.colorSwatchOuter,
+                        isSelected && styles.colorSwatchOuterActive,
                       ]}
+                      onPress={() => {
+                        setSelectedColor(color);
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }}
                     >
-                      {color}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <View
+                        style={[
+                          styles.colorSwatch,
+                          { backgroundColor: hex },
+                          hex.toLowerCase() === "#ffffff" && styles.colorSwatchWhite,
+                        ]}
+                      />
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -313,7 +367,12 @@ export default function ProductDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
+  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
   errorText: {
     fontSize: 16,
     fontFamily: "Inter_500Medium",
@@ -338,11 +397,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   imageSection: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.productImageBg,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 40,
     paddingTop: 80,
+    ...cardShadow,
   },
   wishlistBtn: {
     position: "absolute",
@@ -413,24 +473,35 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   sizeChipTextActive: { color: Colors.accent },
-  colorChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1.5,
+  colorSwatchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    flexWrap: "wrap",
+  },
+  colorSwatchOuter: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    padding: 3,
+    borderWidth: 2,
     borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  colorChipActive: {
+  colorSwatchOuterActive: {
     borderColor: Colors.accent,
-    backgroundColor: `${Colors.accent}10`,
+    borderWidth: 2.5,
   },
-  colorChipText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.text,
+  colorSwatch: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
   },
-  colorChipTextActive: { color: Colors.accent },
+  colorSwatchWhite: {
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.12)",
+  },
   qtyRow: { flexDirection: "row", alignItems: "center", gap: 16 },
   qtyBtn: {
     width: 36,
@@ -486,6 +557,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
+    ...cardShadow,
   },
   bottomPrice: { flex: 1 },
   bottomPriceLabel: {
@@ -504,8 +576,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 16,
+    minHeight: 52,
+    borderRadius: 14,
     gap: 8,
   },
   addedBtn: { backgroundColor: Colors.success },

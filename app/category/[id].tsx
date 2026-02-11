@@ -14,8 +14,8 @@ import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Colors from "@/constants/colors";
-import { getImageUrl } from "@/lib/query-client";
+import Colors, { cardShadow } from "@/constants/colors";
+import { getListingImageAndColor } from "@/lib/query-client";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48 - 12) / 2;
@@ -39,11 +39,11 @@ export default function CategoryScreen() {
       <Pressable
         style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.9 }]}
         onPress={() =>
-          router.push({ pathname: "/product/[id]", params: { id: item.id.toString() } })
+          router.push({ pathname: "/product/[id]", params: { id: item.id.toString(), color: getListingImageAndColor(item).color ?? undefined } })
         }
       >
         <View style={styles.productImageContainer}>
-          <Image source={{ uri: getImageUrl(item.image) }} style={styles.productImage} />
+          <Image source={getListingImageAndColor(item).imageSource} style={styles.productImage} resizeMode="contain" />
         </View>
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
@@ -66,6 +66,7 @@ export default function CategoryScreen() {
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
       ) : !products || products.length === 0 ? (
         <View style={styles.center}>
@@ -112,6 +113,11 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
   emptyText: {
     fontSize: 15,
     fontFamily: "Inter_500Medium",
@@ -122,15 +128,16 @@ const styles = StyleSheet.create({
   productCard: {
     width: CARD_WIDTH,
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: Colors.borderLight,
-    marginBottom: 12,
+    marginBottom: 14,
+    ...cardShadow,
   },
   productImageContainer: {
-    backgroundColor: Colors.white,
-    padding: 10,
+    backgroundColor: Colors.productImageBg,
+    padding: 12,
     alignItems: "center",
     justifyContent: "center",
     height: CARD_WIDTH,
@@ -140,7 +147,7 @@ const styles = StyleSheet.create({
     height: "100%",
     resizeMode: "contain",
   },
-  productInfo: { padding: 10 },
+  productInfo: { padding: 12 },
   productName: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",

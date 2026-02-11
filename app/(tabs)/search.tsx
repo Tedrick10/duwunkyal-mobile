@@ -15,9 +15,9 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Colors from "@/constants/colors";
+import Colors, { cardShadow } from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
-import { getImageUrl } from "@/lib/query-client";
+import { getListingImageAndColor } from "@/lib/query-client";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48 - 12) / 2;
@@ -59,11 +59,11 @@ export default function SearchScreen() {
       <Pressable
         style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.9 }, { backgroundColor: C.surface, borderColor: C.borderLight }]}
         onPress={() =>
-          router.push({ pathname: "/product/[id]", params: { id: item.id.toString() } })
+          router.push({ pathname: "/product/[id]", params: { id: item.id.toString(), color: getListingImageAndColor(item).color ?? undefined } })
         }
       >
-        <View style={[styles.productImageContainer, { backgroundColor: C.surface }]}>
-          <Image source={{ uri: getImageUrl(item.image) }} style={styles.productImage} />
+        <View style={[styles.productImageContainer, { backgroundColor: C.productImageBg ?? Colors.productImageBg }]}>
+          <Image source={getListingImageAndColor(item).imageSource} style={styles.productImage} resizeMode="contain" />
         </View>
         <View style={styles.productInfo}>
           <Text style={[styles.productName, { color: C.text }]} numberOfLines={2}>
@@ -132,6 +132,7 @@ export default function SearchScreen() {
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={C.accent} />
+          <Text style={[styles.loadingText, { color: C.textSecondary }]}>Loading...</Text>
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.center}>
@@ -209,25 +210,31 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
   emptyText: {
     fontSize: 15,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
   grid: { paddingHorizontal: 20, paddingBottom: 100 },
-  gridRow: { gap: 12 },
+  gridRow: { gap: 14 },
   productCard: {
     width: CARD_WIDTH,
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: Colors.borderLight,
-    marginBottom: 12,
+    marginBottom: 14,
+    ...cardShadow,
   },
   productImageContainer: {
-    backgroundColor: Colors.white,
-    padding: 10,
+    backgroundColor: Colors.productImageBg,
+    padding: 12,
     alignItems: "center",
     justifyContent: "center",
     height: CARD_WIDTH,
@@ -237,7 +244,7 @@ const styles = StyleSheet.create({
     height: "100%",
     resizeMode: "contain",
   },
-  productInfo: { padding: 10 },
+  productInfo: { padding: 12 },
   productName: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
