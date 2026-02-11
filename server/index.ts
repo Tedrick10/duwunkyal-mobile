@@ -198,7 +198,11 @@ function configureExpoAndLanding(app: express.Application) {
     next();
   });
 
-  app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
+  app.use("/assets", (req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  }, express.static(path.resolve(process.cwd(), "assets")));
   app.use("/models", express.static(path.resolve(process.cwd(), "public/models")));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 

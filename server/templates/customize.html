@@ -586,61 +586,89 @@
     const productBackImg = productImageBack || defaultBackImg;
 
     const bgImg = document.getElementById('tshirt-bg');
+    const colorImg = document.createElement('img');
+    colorImg.id = 'tshirt-color-img';
+    colorImg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;pointer-events:none;display:none;';
+    document.querySelector('.tshirt-bg-wrap').appendChild(colorImg);
+
     const offCanvas = document.createElement('canvas');
-    const offCtx = offCanvas.getContext('2d');
+    const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
 
     let frontImgEl = null;
     let backImgEl = null;
+    let frontImgData = null;
+    let backImgData = null;
 
     function loadTshirtImage(src, callback) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = function() { callback(img); };
+      img.onerror = function() {
+        const img2 = new Image();
+        img2.onload = function() { callback(img2); };
+        img2.src = src;
+      };
       img.src = src;
+    }
+
+    function extractImageData(img) {
+      offCanvas.width = img.naturalWidth;
+      offCanvas.height = img.naturalHeight;
+      offCtx.clearRect(0, 0, offCanvas.width, offCanvas.height);
+      offCtx.drawImage(img, 0, 0);
+      try {
+        return offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+      } catch(e) {
+        return null;
+      }
     }
 
     function renderTshirtBg() {
       const img = currentView === 'front' ? frontImgEl : backImgEl;
       if (!img) return;
 
-      const w = img.naturalWidth;
-      const h = img.naturalHeight;
+      bgImg.src = img.src;
+
+      if (tshirtColor === '#ffffff') {
+        colorImg.style.display = 'none';
+        return;
+      }
+
+      const cached = currentView === 'front' ? frontImgData : backImgData;
+      const srcData = cached || extractImageData(img);
+      if (!srcData) {
+        colorImg.style.display = 'none';
+        return;
+      }
+      if (currentView === 'front' && !frontImgData) frontImgData = srcData;
+      if (currentView === 'back' && !backImgData) backImgData = srcData;
+
+      const w = srcData.width;
+      const h = srcData.height;
       offCanvas.width = w;
       offCanvas.height = h;
 
-      offCtx.clearRect(0, 0, w, h);
-      offCtx.drawImage(img, 0, 0);
+      const tr = parseInt(tshirtColor.slice(1, 3), 16);
+      const tg = parseInt(tshirtColor.slice(3, 5), 16);
+      const tb = parseInt(tshirtColor.slice(5, 7), 16);
 
-      if (tshirtColor !== '#ffffff') {
-        const tr = parseInt(tshirtColor.slice(1, 3), 16);
-        const tg = parseInt(tshirtColor.slice(3, 5), 16);
-        const tb = parseInt(tshirtColor.slice(5, 7), 16);
+      const newData = offCtx.createImageData(w, h);
+      const sd = srcData.data;
+      const dd = newData.data;
 
-        const imageData = offCtx.getImageData(0, 0, w, h);
-        const d = imageData.data;
-
-        let maxLum = 0;
-        for (let i = 0; i < d.length; i += 4) {
-          if (d[i + 3] === 0) continue;
-          const l = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-          if (l > maxLum) maxLum = l;
-        }
-        if (maxLum === 0) maxLum = 255;
-
-        const detailStrength = 0.12;
-        for (let i = 0; i < d.length; i += 4) {
-          if (d[i + 3] === 0) continue;
-          const lum = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / maxLum;
-          const shadow = 1 - (1 - lum) * detailStrength;
-          d[i]     = Math.min(255, Math.round(tr * shadow));
-          d[i + 1] = Math.min(255, Math.round(tg * shadow));
-          d[i + 2] = Math.min(255, Math.round(tb * shadow));
-        }
-
-        offCtx.putImageData(imageData, 0, 0);
+      for (let i = 0; i < sd.length; i += 4) {
+        const a = sd[i + 3];
+        if (a === 0) continue;
+        dd[i]     = tr;
+        dd[i + 1] = tg;
+        dd[i + 2] = tb;
+        dd[i + 3] = a;
       }
 
-      bgImg.src = offCanvas.toDataURL('image/png');
+      offCtx.clearRect(0, 0, w, h);
+      offCtx.putImageData(newData, 0, 0);
+      colorImg.src = offCanvas.toDataURL('image/png');
+      colorImg.style.display = 'block';
     }
 
     loadTshirtImage(productFrontImg, function(img) {
