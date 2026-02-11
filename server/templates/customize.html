@@ -619,9 +619,18 @@
         const imageData = offCtx.getImageData(0, 0, w, h);
         const d = imageData.data;
 
+        let maxLum = 0;
         for (let i = 0; i < d.length; i += 4) {
           if (d[i + 3] === 0) continue;
-          const lum = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
+          const l = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+          if (l > maxLum) maxLum = l;
+        }
+        if (maxLum === 0) maxLum = 255;
+
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i + 3] === 0) continue;
+          const raw = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / maxLum;
+          const lum = Math.pow(Math.min(raw, 1), 0.6);
           d[i]     = Math.min(255, Math.round(tr * lum));
           d[i + 1] = Math.min(255, Math.round(tg * lum));
           d[i + 2] = Math.min(255, Math.round(tb * lum));
