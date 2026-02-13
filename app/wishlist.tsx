@@ -17,6 +17,7 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-client";
+import { formatPriceMMK } from "@/lib/format";
 
 export default function WishlistScreen() {
   const insets = useSafeAreaInsets();
@@ -91,7 +92,7 @@ export default function WishlistScreen() {
             {item.product.name}
           </Text>
           <Text style={styles.itemPrice}>
-            ${parseFloat(item.product.price).toFixed(2)}
+            {formatPriceMMK(item.product.price)}
           </Text>
         </View>
         <Pressable

@@ -19,7 +19,12 @@ type Props = {
   objUri: string | null;
   objReady?: boolean;
   compact?: boolean;
-  designTextureUri?: string | null;
+  /** When false, renders a single frame (no animation loop). */
+  active?: boolean;
+  frontDesignTextureUri?: string | null;
+  frontDesignTextureVersion?: number;
+  backDesignTextureUri?: string | null;
+  backDesignTextureVersion?: number;
 };
 
 const ROTATION_SPEED = 0.008;
@@ -51,13 +56,13 @@ function ensureGeometryUVs(geometry: THREE.BufferGeometry): void {
 function addObjToScene(
   obj: THREE.Group,
   scene: THREE.Scene,
-  material: THREE.MeshStandardMaterial
+  material: THREE.Material
 ) {
   obj.traverse((child: THREE.Object3D) => {
     if ((child as THREE.Mesh).isMesh) {
       const mesh = child as THREE.Mesh;
       if (mesh.geometry) ensureGeometryUVs(mesh.geometry);
-      mesh.material = material;
+      mesh.material = material as any;
     }
   });
   const box = new THREE.Box3().setFromObject(obj);
@@ -70,18 +75,107 @@ function addObjToScene(
   scene.add(obj);
 }
 
-export function Preview3D({ tshirtColor, objUri, objReady = true, compact = false, designTextureUri = null }: Props) {
+function splitGeometryFrontBackByZ(geometry: THREE.BufferGeometry): {
+  front: THREE.BufferGeometry | null;
+  back: THREE.BufferGeometry | null;
+} {
+  const posAttr = geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
+  if (!posAttr) return { front: null, back: null };
+  const uvAttr = geometry.getAttribute("uv") as THREE.BufferAttribute | undefined;
+  const normalAttr = geometry.getAttribute("normal") as THREE.BufferAttribute | undefined;
+
+  // Compute mid Z for front/back split (local space).
+  const box = new THREE.Box3().setFromBufferAttribute(posAttr);
+  const midZ = (box.min.z + box.max.z) / 2;
+
+  const indexAttr = geometry.getIndex();
+  const indices: ArrayLike<number> = indexAttr ? indexAttr.array : (Array.from({ length: posAttr.count }, (_, i) => i) as number[]);
+  const triCount = Math.floor(indices.length / 3);
+
+  const frontIdx: number[] = [];
+  const backIdx: number[] = [];
+
+  for (let t = 0; t < triCount; t++) {
+    const a = indices[t * 3]!;
+    const b = indices[t * 3 + 1]!;
+    const c = indices[t * 3 + 2]!;
+    const avgZ = (posAttr.getZ(a) + posAttr.getZ(b) + posAttr.getZ(c)) / 3;
+    const target = avgZ >= midZ ? frontIdx : backIdx;
+    target.push(a, b, c);
+  }
+
+  const mk = (idx: number[]): THREE.BufferGeometry | null => {
+    if (!idx.length) return null;
+    const out = new THREE.BufferGeometry();
+    // Share attributes (no large copies).
+    out.setAttribute("position", posAttr);
+    if (uvAttr) out.setAttribute("uv", uvAttr);
+    if (normalAttr) out.setAttribute("normal", normalAttr);
+    out.setIndex(idx);
+    out.computeBoundingSphere();
+    return out;
+  };
+
+  return { front: mk(frontIdx), back: mk(backIdx) };
+}
+
+function createDecalMesh(
+  baseMesh: THREE.Mesh,
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material
+): THREE.Mesh {
+  const decal = new THREE.Mesh(geometry, material);
+  decal.position.copy(baseMesh.position);
+  decal.quaternion.copy(baseMesh.quaternion);
+  decal.scale.copy(baseMesh.scale);
+  decal.matrixAutoUpdate = baseMesh.matrixAutoUpdate;
+  if (!decal.matrixAutoUpdate) decal.matrix.copy(baseMesh.matrix);
+  // Draw after base shirt.
+  decal.renderOrder = 2;
+  return decal;
+}
+
+export function Preview3D({
+  tshirtColor,
+  objUri,
+  objReady = true,
+  compact = false,
+  active = !compact,
+  frontDesignTextureUri = null,
+  frontDesignTextureVersion = 0,
+  backDesignTextureUri = null,
+  backDesignTextureVersion = 0,
+}: Props) {
   const animRef = useRef<number | null>(null);
   const rotationRef = useRef({ x: 0, y: 0 });
   const prevPanRef = useRef({ x: 0, y: 0 });
-  const materialRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const baseMaterialRef = useRef<THREE.MeshLambertMaterial | null>(null);
+  const frontDecalMaterialRef = useRef<THREE.MeshLambertMaterial | null>(null);
+  const backDecalMaterialRef = useRef<THREE.MeshLambertMaterial | null>(null);
+  const decalMeshesRef = useRef<THREE.Mesh[]>([]);
+  const activeRef = useRef(active);
+  const renderFrameRef = useRef<(() => void) | null>(null);
+  const requestRenderRef = useRef<(() => void) | null>(null);
+  const pendingRafRef = useRef<number | null>(null);
   const tshirtColorRef = useRef(tshirtColor);
   tshirtColorRef.current = tshirtColor;
   const [modelReady, setModelReady] = useState(false);
 
+  useEffect(() => {
+    activeRef.current = active;
+    // When switching to inactive, render once to settle.
+    if (!active) renderFrameRef.current?.();
+  }, [active]);
+
   useEffect(() => () => {
     if (animRef.current != null) cancelAnimationFrame(animRef.current);
-    materialRef.current = null;
+    if (pendingRafRef.current != null) cancelAnimationFrame(pendingRafRef.current);
+    baseMaterialRef.current = null;
+    frontDecalMaterialRef.current = null;
+    backDecalMaterialRef.current = null;
+    decalMeshesRef.current = [];
+    renderFrameRef.current = null;
+    requestRenderRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -89,59 +183,122 @@ export function Preview3D({ tshirtColor, objUri, objReady = true, compact = fals
   }, []);
 
   useEffect(() => {
-    if (materialRef.current && !materialRef.current.map) materialRef.current.color.setStyle(tshirtColor);
+    // Base shirt color always comes from tshirtColor.
+    if (baseMaterialRef.current) {
+      baseMaterialRef.current.color.setStyle(tshirtColor);
+      baseMaterialRef.current.needsUpdate = true;
+      requestRenderRef.current?.();
+    }
   }, [tshirtColor]);
 
   useEffect(() => {
-    if (!designTextureUri && materialRef.current) {
-      if (materialRef.current.map) {
-        materialRef.current.map.dispose();
-        materialRef.current.map = null;
-      }
-      materialRef.current.color.setStyle(tshirtColor);
-    }
-  }, [designTextureUri, tshirtColor]);
-
-  useEffect(() => {
-    if (modelReady && materialRef.current && !materialRef.current.map) {
-      materialRef.current.color.setStyle(tshirtColor);
+    if (!modelReady) return;
+    // Ensure base color is synced after GL init.
+    if (baseMaterialRef.current) {
+      baseMaterialRef.current.color.setStyle(tshirtColor);
+      baseMaterialRef.current.needsUpdate = true;
+      requestRenderRef.current?.();
     }
   }, [modelReady, tshirtColor]);
 
   // Full-screen: force color sync one frame after GL is ready (avoids stale ref on first paint)
   useEffect(() => {
-    if (compact || !modelReady || !materialRef.current || materialRef.current.map) return;
+    if (compact || !modelReady || !baseMaterialRef.current) return;
     const id = requestAnimationFrame(() => {
-      if (materialRef.current && !materialRef.current.map)
-        materialRef.current.color.setStyle(tshirtColor);
+      if (baseMaterialRef.current) baseMaterialRef.current.color.setStyle(tshirtColor);
     });
     return () => cancelAnimationFrame(id);
   }, [compact, modelReady, tshirtColor]);
 
   useEffect(() => {
-    if (!designTextureUri || !materialRef.current || !modelReady) return;
+    if (!modelReady || !frontDecalMaterialRef.current) return;
     let cancelled = false;
-    const textureAsset = Asset.fromURI(designTextureUri);
+
+    const applyNone = () => {
+      const mat = frontDecalMaterialRef.current;
+      if (!mat) return;
+      if (mat.map) {
+        mat.map.dispose();
+        mat.map = null;
+      }
+      mat.opacity = 0;
+      mat.needsUpdate = true;
+    };
+
+    if (!frontDesignTextureUri) {
+      applyNone();
+      return;
+    }
+
+    const textureAsset = Asset.fromURI(frontDesignTextureUri);
     textureAsset
       .downloadAsync()
       .then(() => loadTextureAsync({ asset: textureAsset }))
       .then((tex: THREE.Texture) => {
-        if (!cancelled && materialRef.current) {
-          materialRef.current.map = tex;
-          materialRef.current.color.setStyle(tshirtColor);
-        }
+        const mat = frontDecalMaterialRef.current;
+        if (cancelled || !mat) return;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.needsUpdate = true;
+        mat.map = tex;
+        mat.opacity = 1;
+        mat.needsUpdate = true;
+        requestRenderRef.current?.();
       })
       .catch(() => {
-        if (!cancelled && materialRef.current) materialRef.current.map = null;
+        if (!cancelled) applyNone();
       });
     return () => {
       cancelled = true;
-      if (materialRef.current?.map) {
-        materialRef.current.map.dispose();
-        materialRef.current.map = null;
-      }
+      // Don't dispose here; next effect run will manage it.
     };
-  }, [designTextureUri, modelReady, tshirtColor]);
+  }, [frontDesignTextureUri, frontDesignTextureVersion, modelReady]);
+
+  useEffect(() => {
+    if (!modelReady || !backDecalMaterialRef.current) return;
+    let cancelled = false;
+
+    const applyNone = () => {
+      const mat = backDecalMaterialRef.current;
+      if (!mat) return;
+      if (mat.map) {
+        mat.map.dispose();
+        mat.map = null;
+      }
+      mat.opacity = 0;
+      mat.needsUpdate = true;
+    };
+
+    if (!backDesignTextureUri) {
+      applyNone();
+      return;
+    }
+
+    const textureAsset = Asset.fromURI(backDesignTextureUri);
+    textureAsset
+      .downloadAsync()
+      .then(() => loadTextureAsync({ asset: textureAsset }))
+      .then((tex: THREE.Texture) => {
+        const mat = backDecalMaterialRef.current;
+        if (cancelled || !mat) return;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        // Flip horizontally so back text/images are not mirrored.
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.repeat.x = -1;
+        tex.offset.x = 1;
+        tex.needsUpdate = true;
+        mat.map = tex;
+        mat.opacity = 1;
+        mat.needsUpdate = true;
+        requestRenderRef.current?.();
+      })
+      .catch(() => {
+        if (!cancelled) applyNone();
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [backDesignTextureUri, backDesignTextureVersion, modelReady]);
 
   useEffect(() => {
     if (objUri) setModelReady(false);
@@ -166,6 +323,7 @@ export function Preview3D({ tshirtColor, objUri, objReady = true, compact = fals
           prevPanRef.current = { x: pageX, y: pageY };
           rotationRef.current.y += dx * ROTATION_SPEED;
           rotationRef.current.x -= dy * ROTATION_SPEED;
+          requestRenderRef.current?.();
         },
       }),
     []
@@ -183,28 +341,52 @@ export function Preview3D({ tshirtColor, objUri, objReady = true, compact = fals
 
     const renderer = new Renderer({
       gl,
-      antialias: true,
+      // Antialias is expensive on mobile; keep it off for smoother interaction.
+      antialias: false,
       width,
       height,
-      pixelRatio: Math.min(2, gl.drawingBufferWidth / width),
+      // Cap pixel ratio hard to reduce GPU load.
+      pixelRatio: 1,
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
     dirLight.position.set(2, 3, 4);
     scene.add(dirLight);
-    const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    backLight.position.set(-2, 1, -3);
-    scene.add(backLight);
 
-    const material = new THREE.MeshStandardMaterial({
+    // Use Lambert for better mobile performance (cheaper than Standard/PBR).
+    const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(initialColor),
-      roughness: 0.7,
-      metalness: 0,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
     });
-    materialRef.current = material;
+    baseMaterialRef.current = material;
+
+    const frontDecalMat = new THREE.MeshLambertMaterial({
+      color: new THREE.Color("#ffffff"),
+      side: THREE.FrontSide,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+      alphaTest: 0.01,
+    });
+    frontDecalMaterialRef.current = frontDecalMat;
+
+    const backDecalMat = new THREE.MeshLambertMaterial({
+      color: new THREE.Color("#ffffff"),
+      side: THREE.FrontSide,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+      alphaTest: 0.01,
+    });
+    backDecalMaterialRef.current = backDecalMat;
 
     let mesh: THREE.Object3D | null = null;
     let rootObj: THREE.Group | null = null;
@@ -242,11 +424,49 @@ export function Preview3D({ tshirtColor, objUri, objReady = true, compact = fals
       scene.add(mesh);
     }
 
+    // Add decal overlay meshes (front/back) so designs only show on correct side.
+    const decalMeshes: THREE.Mesh[] = [];
+    if (rootObj) {
+      rootObj.traverse((child: THREE.Object3D) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const baseMesh = child as THREE.Mesh;
+          if (baseMesh.geometry) ensureGeometryUVs(baseMesh.geometry);
+          const split = splitGeometryFrontBackByZ(baseMesh.geometry);
+          const parent = baseMesh.parent;
+          if (!parent) return;
+          if (split.front) {
+            const frontDecal = createDecalMesh(baseMesh, split.front, frontDecalMat);
+            parent.add(frontDecal);
+            decalMeshes.push(frontDecal);
+          }
+          if (split.back) {
+            const backDecal = createDecalMesh(baseMesh, split.back, backDecalMat);
+            parent.add(backDecal);
+            decalMeshes.push(backDecal);
+          }
+        }
+      });
+    } else if (mesh && (mesh as THREE.Mesh).isMesh) {
+      const baseMesh = mesh as THREE.Mesh;
+      if (baseMesh.geometry) ensureGeometryUVs(baseMesh.geometry);
+      const split = splitGeometryFrontBackByZ(baseMesh.geometry);
+      if (split.front) {
+        const frontDecal = createDecalMesh(baseMesh, split.front, frontDecalMat);
+        scene.add(frontDecal);
+        decalMeshes.push(frontDecal);
+      }
+      if (split.back) {
+        const backDecal = createDecalMesh(baseMesh, split.back, backDecalMat);
+        scene.add(backDecal);
+        decalMeshes.push(backDecal);
+      }
+    }
+    decalMeshesRef.current = decalMeshes;
+
     material.color.setStyle(initialColor);
     setModelReady(true);
 
-    function animate() {
-      animRef.current = requestAnimationFrame(animate);
+    const renderFrame = () => {
       const { x, y } = rotationRef.current;
       if (rootObj) {
         rootObj.rotation.x = x;
@@ -257,8 +477,21 @@ export function Preview3D({ tshirtColor, objUri, objReady = true, compact = fals
       }
       renderer.render(scene, camera);
       gl.endFrameEXP();
-    }
-    animate();
+    };
+    renderFrameRef.current = renderFrame;
+
+    const requestRender = () => {
+      if (!activeRef.current) return;
+      if (pendingRafRef.current != null) return;
+      pendingRafRef.current = requestAnimationFrame(() => {
+        pendingRafRef.current = null;
+        renderFrameRef.current?.();
+      });
+    };
+    requestRenderRef.current = requestRender;
+
+    // Render once immediately.
+    renderFrame();
 
   };
 

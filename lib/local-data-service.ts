@@ -13,6 +13,7 @@ import {
   type Product,
   type Category,
 } from "./dummy-data";
+import type { CustomizationData } from "@/components/customize/types";
 
 const STORAGE_KEYS = {
   CART: "@duwunkyaw_cart",
@@ -103,18 +104,31 @@ export const LocalDataService = {
     return loadCart();
   },
 
-  async addToCart(productId: number, quantity: number, size?: string, color?: string): Promise<CartItemData> {
+  async addToCart(
+    productId: number,
+    quantity: number,
+    size?: string,
+    color?: string,
+    customization?: CustomizationData | null,
+    customPrice?: string | null
+  ): Promise<CartItemData> {
     const cart = await loadCart();
     const product = PRODUCTS.find((p) => p.id === productId);
     if (!product) throw new Error("Product not found");
 
-    const existing = cart.find(
-      (item) => item.productId === productId && item.size === (size || null) && item.color === (color || null)
-    );
-    if (existing) {
-      existing.quantity += quantity;
-      await saveCart();
-      return existing;
+    if (!customization) {
+      const existing = cart.find(
+        (item) =>
+          !item.customization &&
+          item.productId === productId &&
+          item.size === (size || null) &&
+          item.color === (color || null)
+      );
+      if (existing) {
+        existing.quantity += quantity;
+        await saveCart();
+        return existing;
+      }
     }
 
     const newItem: CartItemData = {
@@ -126,6 +140,7 @@ export const LocalDataService = {
       color: color || null,
       createdAt: new Date().toISOString(),
       product,
+      ...(customization ? { customization, customPrice: customPrice ?? String(customization.totalPrice) } : {}),
     };
     cart.push(newItem);
     _cart = cart;
@@ -161,7 +176,10 @@ export const LocalDataService = {
     const cart = await loadCart();
     if (cart.length === 0) throw new Error("Cart is empty");
 
-    const total = cart.reduce((sum, item) => sum + parseFloat(item.product.price) * item.quantity, 0);
+    const total = cart.reduce(
+      (sum, item) => sum + parseFloat(item.customPrice ?? item.product.price) * item.quantity,
+      0
+    );
 
     const order: OrderData = {
       id: _nextOrderId++,
@@ -175,7 +193,7 @@ export const LocalDataService = {
         orderId: _nextOrderId - 1,
         productId: item.productId,
         quantity: item.quantity,
-        price: item.product.price,
+        price: item.customPrice ?? item.product.price,
         size: item.size,
         color: item.color,
         product: item.product,

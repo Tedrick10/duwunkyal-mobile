@@ -17,6 +17,7 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
+import { formatPriceMMK } from "@/lib/format";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -166,7 +167,7 @@ export default function ProfileScreen() {
                   {new Date(order.createdAt).toLocaleDateString()}
                 </Text>
                 <Text style={[styles.orderTotal, { color: C.text }]}>
-                  ${parseFloat(order.total).toFixed(2)}
+                  {formatPriceMMK(order.total)}
                 </Text>
               </View>
             </Pressable>

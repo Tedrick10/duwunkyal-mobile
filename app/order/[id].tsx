@@ -13,6 +13,7 @@ import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getProductImageSource } from "@/lib/query-client";
+import { formatPriceMMK } from "@/lib/format";
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -96,14 +97,14 @@ export default function OrderDetailScreen() {
               </Text>
             </View>
             <Text style={styles.itemPrice}>
-              ${(parseFloat(item.price) * item.quantity).toFixed(2)}
+              {formatPriceMMK(parseFloat(item.price) * item.quantity)}
             </Text>
           </View>
         ))}
         <View style={styles.divider} />
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>${parseFloat(order.total).toFixed(2)}</Text>
+          <Text style={styles.totalValue}>{formatPriceMMK(order.total)}</Text>
         </View>
       </View>
     </ScrollView>

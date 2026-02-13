@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors, { cardShadow } from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
 import { getListingImageAndColor } from "@/lib/query-client";
+import { formatPriceMMK } from "@/lib/format";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48 - 12) / 2;
@@ -70,7 +71,7 @@ export default function SearchScreen() {
             {item.name}
           </Text>
           <Text style={styles.productPrice}>
-            ${parseFloat(item.price).toFixed(2)}
+            {formatPriceMMK(item.price)}
           </Text>
         </View>
       </Pressable>

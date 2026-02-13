@@ -20,6 +20,8 @@ export interface Product {
   createdAt: string;
 }
 
+import type { CustomizationData } from "@/components/customize/types";
+
 export interface CartItemData {
   id: number;
   userId: number;
@@ -29,6 +31,10 @@ export interface CartItemData {
   color: string | null;
   createdAt: string;
   product: Product;
+  /** Set when added from Customize screen – colors + front/back design for viewing in cart */
+  customization?: CustomizationData | null;
+  /** Line price when customization is set (totalPrice from customize); else use product.price */
+  customPrice?: string | null;
 }
 
 export interface OrderData {

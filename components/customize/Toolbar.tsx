@@ -10,15 +10,15 @@ import { Ionicons } from "@expo/vector-icons";
 type Props = {
   onImage: () => void;
   onText: () => void;
-  onShapeRect: () => void;
-  onShapeCircle: () => void;
+  onCliparts: () => void;
+  onTemplate: () => void;
 };
 
 export function Toolbar({
   onImage,
   onText,
-  onShapeRect,
-  onShapeCircle,
+  onCliparts,
+  onTemplate,
 }: Props) {
   return (
     <View style={styles.toolbar}>
@@ -30,13 +30,13 @@ export function Toolbar({
         <Ionicons name="text-outline" size={20} color="#555" />
         <Text style={styles.btnLabel}>Text</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.btn} onPress={onShapeRect} activeOpacity={0.7}>
-        <Ionicons name="square-outline" size={20} color="#555" />
-        <Text style={styles.btnLabel}>Shape</Text>
+      <TouchableOpacity style={styles.btn} onPress={onCliparts} activeOpacity={0.7}>
+        <Ionicons name="sparkles-outline" size={20} color="#555" />
+        <Text style={styles.btnLabel}>Cliparts</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.btn} onPress={onShapeCircle} activeOpacity={0.7}>
-        <Ionicons name="ellipse-outline" size={20} color="#555" />
-        <Text style={styles.btnLabel}>Circle</Text>
+      <TouchableOpacity style={styles.btn} onPress={onTemplate} activeOpacity={0.7}>
+        <Ionicons name="grid-outline" size={20} color="#555" />
+        <Text style={styles.btnLabel}>Template</Text>
       </TouchableOpacity>
     </View>
   );

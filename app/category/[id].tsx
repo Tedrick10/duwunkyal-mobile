@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors, { cardShadow } from "@/constants/colors";
 import { getListingImageAndColor } from "@/lib/query-client";
+import { formatPriceMMK } from "@/lib/format";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48 - 12) / 2;
@@ -47,7 +48,7 @@ export default function CategoryScreen() {
         </View>
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.productPrice}>${parseFloat(item.price).toFixed(2)}</Text>
+          <Text style={styles.productPrice}>{formatPriceMMK(item.price)}</Text>
         </View>
       </Pressable>
     );

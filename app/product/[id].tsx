@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient, getImageUrl, getProductImageSource, getTshirtImageForColor } from "@/lib/query-client";
+import { formatPriceMMK } from "@/lib/format";
 
 const { width } = Dimensions.get("window");
 
@@ -198,7 +199,7 @@ export default function ProductDetailScreen() {
         <View style={styles.infoSection}>
           <Text style={styles.productName}>{product.name}</Text>
           <Text style={styles.productPrice}>
-            ${parseFloat(product.price).toFixed(2)}
+            {formatPriceMMK(product.price)}
           </Text>
 
           {product.description && (
@@ -333,7 +334,7 @@ export default function ProductDetailScreen() {
         <View style={styles.bottomPrice}>
           <Text style={styles.bottomPriceLabel}>Total</Text>
           <Text style={styles.bottomPriceValue}>
-            ${(parseFloat(product.price) * quantity).toFixed(2)}
+            {formatPriceMMK(parseFloat(product.price) * quantity)}
           </Text>
         </View>
         <Pressable

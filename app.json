@@ -2,7 +2,7 @@
   "expo": {
     "name": "DUWUN KYAL",
     "slug": "duwunkyal",
-    "version": "1.0.0",
+    "version": "1.0.0+3",
     "orientation": "portrait",
     "icon": "./assets/images/favicon.png",
     "scheme": "duwunkyal",

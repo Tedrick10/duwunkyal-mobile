@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -19,12 +19,15 @@ import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-client";
+import { formatPriceMMK } from "@/lib/format";
+import { CustomDesignViewerModal } from "@/components/customize/CustomDesignViewerModal";
 
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const webTopInset = Platform.OS === "web" ? 67 : 0;
   const { user } = useAuth();
   const { colors: C } = useTheme();
+  const [viewingDesignItem, setViewingDesignItem] = useState<any>(null);
 
   const { data: cartItems, isLoading } = useQuery<any[]>({
     queryKey: ["/api/cart"],
@@ -46,7 +49,11 @@ export default function CartScreen() {
   });
 
   const total = cartItems
-    ? cartItems.reduce((sum, item) => sum + parseFloat(item.product.price) * item.quantity, 0)
+    ? cartItems.reduce(
+      (sum, item) =>
+        sum + parseFloat(item.customPrice ?? item.product.price) * item.quantity,
+      0
+    )
     : 0;
 
   function handleQuantity(item: any, delta: number) {
@@ -85,6 +92,8 @@ export default function CartScreen() {
   }
 
   function renderCartItem({ item }: { item: any }) {
+    const isCustom = item.customization != null;
+    const price = item.customPrice ?? item.product.price;
     return (
       <View style={[styles.cartItem, { backgroundColor: C.surface, borderColor: C.borderLight }]}>
         <Pressable
@@ -101,13 +110,26 @@ export default function CartScreen() {
           <Text style={[styles.cartItemName, { color: C.text }]} numberOfLines={2}>
             {item.product.name}
           </Text>
+          {isCustom && (
+            <Text style={[styles.cartItemVariant, { color: Colors.accent, fontWeight: "600" }]}>
+              Custom design
+            </Text>
+          )}
           {(item.size || item.color) && (
             <Text style={[styles.cartItemVariant, { color: C.textSecondary }]}>
               {[item.size, item.color].filter(Boolean).join(" / ")}
             </Text>
           )}
+          {isCustom && (
+            <Pressable
+              style={styles.viewDesignBtn}
+              onPress={() => setViewingDesignItem(item)}
+            >
+              <Text style={styles.viewDesignBtnText}>View design</Text>
+            </Pressable>
+          )}
           <Text style={styles.cartItemPrice}>
-            ${parseFloat(item.product.price).toFixed(2)}
+            {formatPriceMMK(price)}
           </Text>
           <View style={styles.qtyRow}>
             <Pressable
@@ -161,10 +183,23 @@ export default function CartScreen() {
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
+          <CustomDesignViewerModal
+            visible={!!viewingDesignItem}
+            onClose={() => setViewingDesignItem(null)}
+            customization={viewingDesignItem?.customization ?? {
+              bodyColor: "#ffffff",
+              sleeveColor: "#ffffff",
+              collarColor: "#ffffff",
+              frontDesign: [],
+              backDesign: [],
+              totalPrice: 0,
+            }}
+            productName={viewingDesignItem?.product?.name ?? "Product"}
+          />
           <View style={[styles.bottomBar, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 80, backgroundColor: C.surface, borderTopColor: C.border }]}>
             <View style={styles.totalRow}>
               <Text style={[styles.totalLabel, { color: C.textSecondary }]}>Total</Text>
-              <Text style={[styles.totalValue, { color: C.text }]}>${total.toFixed(2)}</Text>
+              <Text style={[styles.totalValue, { color: C.text }]}>{formatPriceMMK(total)}</Text>
             </View>
             <Pressable
               style={({ pressed }) => [styles.checkoutBtn, pressed && { opacity: 0.9 }]}
@@ -253,6 +288,20 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     marginBottom: 2,
+  },
+  viewDesignBtn: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+    marginBottom: 2,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: "rgba(233, 69, 96, 0.12)",
+  },
+  viewDesignBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
   },
   cartItemPrice: {
     fontSize: 15,

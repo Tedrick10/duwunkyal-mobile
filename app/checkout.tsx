@@ -17,6 +17,7 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { formatPriceMMK } from "@/lib/format";
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -30,7 +31,11 @@ export default function CheckoutScreen() {
   });
 
   const total = cartItems
-    ? cartItems.reduce((sum, item) => sum + parseFloat(item.product.price) * item.quantity, 0)
+    ? cartItems.reduce(
+      (sum, item) =>
+        sum + parseFloat(item.customPrice ?? item.product.price) * item.quantity,
+      0
+    )
     : 0;
 
   const orderMutation = useMutation({
@@ -73,14 +78,14 @@ export default function CheckoutScreen() {
               </Text>
             </View>
             <Text style={styles.summaryPrice}>
-              ${(parseFloat(item.product.price) * item.quantity).toFixed(2)}
+              {formatPriceMMK(parseFloat(item.customPrice ?? item.product.price) * item.quantity)}
             </Text>
           </View>
         ))}
         <View style={styles.divider} />
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+          <Text style={styles.totalValue}>{formatPriceMMK(total)}</Text>
         </View>
       </View>
 

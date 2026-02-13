@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
+import { formatPriceMMK } from "@/lib/format";
 import { getCategoryImageSource, getListingImageAndColor } from "@/lib/query-client";
 
 const BANNER_IMAGES: { id: string; image: number }[] = [
@@ -239,7 +240,7 @@ export default function HomeScreen() {
                   <Image source={getListingImageAndColor(product).imageSource} style={styles.featuredImage} resizeMode="contain" />
                 </View>
                 <Text style={[styles.featuredName, { color: C.text }]} numberOfLines={1}>{product.name}</Text>
-                <Text style={styles.featuredPrice}>${parseFloat(product.price).toFixed(2)}</Text>
+                <Text style={styles.featuredPrice}>{formatPriceMMK(product.price)}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -263,7 +264,7 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.productInfo}>
                   <Text style={[styles.productName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
-                  <Text style={styles.productPrice}>${parseFloat(product.price).toFixed(2)}</Text>
+                  <Text style={styles.productPrice}>{formatPriceMMK(product.price)}</Text>
                 </View>
               </Pressable>
             ))}

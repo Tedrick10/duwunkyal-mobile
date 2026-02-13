@@ -100,7 +100,14 @@ export async function apiRequest(
 ): Promise<Response> {
   if (route.startsWith("/api/cart") && method === "POST") {
     const body = data as any;
-    await LocalDataService.addToCart(body.productId, body.quantity || 1, body.size, body.color);
+    await LocalDataService.addToCart(
+      body.productId,
+      body.quantity || 1,
+      body.size,
+      body.color,
+      body.customization ?? null,
+      body.customPrice ?? null
+    );
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
 

@@ -11,56 +11,21 @@ import {
 } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import ViewShot from "react-native-view-shot";
-import { DesignElement, DesignView, CONTAINER_W, CONTAINER_H } from "./types";
+import { DesignElement, DesignView, TshirtColorPart, CONTAINER_W, CONTAINER_H, TSHIRT_REGIONS } from "./types";
 import { ColorBar } from "./ColorBar";
 import { Toolbar } from "./Toolbar";
 import { TextModal } from "./TextModal";
 
 // White t-shirt silhouette: mask reveals exact hex color only on shirt shape (native); web uses tintColor
-const WHITE_TSHIRT_SILHOUETTE = require("@/assets/products/tshirt-white-crew.png");
-
-/** Boost saturation so shirt color appears more vivid in 2D view (display only). */
-function toMoreVividHex(hex: string): string {
-  const m = hex.replace(/^#/, "").match(/^([0-9a-f]{6})$/i);
-  if (!m) return hex;
-  let r = parseInt(m[1].slice(0, 2), 16) / 255;
-  let g = parseInt(m[1].slice(2, 4), 16) / 255;
-  let b = parseInt(m[1].slice(4, 6), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-    else if (max === g) h = ((b - r) / d + 2) / 6;
-    else h = ((r - g) / d + 4) / 6;
-  }
-  s = Math.min(1, s * 1.35);
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-  const hue2rgb = (p: number, q: number, t: number) => {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1 / 6) return p + (q - p) * 6 * t;
-    if (t < 1 / 2) return q;
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-    return p;
-  };
-  r = hue2rgb(p, q, h + 1 / 3);
-  g = hue2rgb(p, q, h);
-  b = hue2rgb(p, q, h - 1 / 3);
-  const R = Math.round(r * 255);
-  const G = Math.round(g * 255);
-  const B = Math.round(b * 255);
-  return `#${R.toString(16).padStart(2, "0")}${G.toString(16).padStart(2, "0")}${B.toString(16).padStart(2, "0")}`;
-}
+// const WHITE_TSHIRT_SILHOUETTE = require("@/assets/products/tshirt-white-crew.png");
 
 type Props = {
   view: DesignView;
-  tshirtColor: string;
+  bodyColor: string;
+  sleeveColor: string;
+  collarColor: string;
+  colorPart: TshirtColorPart;
+  onColorPartChange: (part: TshirtColorPart) => void;
   elements: DesignElement[];
   selectedId: string | null;
   textModalVisible: boolean;
@@ -69,8 +34,8 @@ type Props = {
   onViewChange: (view: DesignView) => void;
   onColorChange: (color: string) => void;
   onAddText: () => void;
-  onAddRect: () => void;
-  onAddCircle: () => void;
+  onCliparts: () => void;
+  onTemplate: () => void;
   onAddImage: () => void;
   onTextModalClose: () => void;
   onTextModalAdd: (opts: {
@@ -84,15 +49,33 @@ type Props = {
   onSelectElement: (id: string | null) => void;
   onDeleteSelected: () => void;
   onMoveElement?: (id: string, x: number, y: number) => void;
+  onUpdateElement?: (id: string, patch: Record<string, any>) => void;
   onDragStart?: () => void;
+  /** When true, hide toolbar/color bar/view switcher and make canvas non-interactive (e.g. for cart design viewer). */
+  readOnly?: boolean;
 };
 
 export type DesignEditorRef = { capture: () => Promise<string | undefined> };
 
 const DRAG_THRESHOLD = 5;
+const DEFAULT_TEXT_W = 120;
+const DEFAULT_TEXT_H = 40;
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function getTextBox(el: any): { w: number; h: number } {
+  const w = typeof el.boxWidth === "number" ? el.boxWidth : DEFAULT_TEXT_W;
+  const h = typeof el.boxHeight === "number" ? el.boxHeight : DEFAULT_TEXT_H;
+  return { w, h };
+}
 
 function getElementBounds(el: DesignElement): { left: number; top: number; width: number; height: number } {
-  if (el.type === "text") return { left: el.x - 60, top: el.y - 20, width: 120, height: 40 };
+  if (el.type === "text") {
+    const { w, h } = getTextBox(el);
+    return { left: el.x - w / 2, top: el.y - h / 2, width: w, height: h };
+  }
   if (el.type === "rect") return { left: el.x - el.width / 2, top: el.y - el.height / 2, width: el.width, height: el.height };
   if (el.type === "circle") return { left: el.x - el.radius, top: el.y - el.radius, width: el.radius * 2, height: el.radius * 2 };
   if (el.type === "image") return { left: el.x - el.width / 2, top: el.y - el.height / 2, width: el.width, height: el.height };
@@ -100,7 +83,10 @@ function getElementBounds(el: DesignElement): { left: number; top: number; width
 }
 
 function getBoundsFromCenter(x: number, y: number, el: DesignElement): { left: number; top: number; width: number; height: number } {
-  if (el.type === "text") return { left: x - 60, top: y - 20, width: 120, height: 40 };
+  if (el.type === "text") {
+    const { w, h } = getTextBox(el);
+    return { left: x - w / 2, top: y - h / 2, width: w, height: h };
+  }
   if (el.type === "rect") return { left: x - el.width / 2, top: y - el.height / 2, width: el.width, height: el.height };
   if (el.type === "circle") return { left: x - el.radius, top: y - el.radius, width: el.radius * 2, height: el.radius * 2 };
   if (el.type === "image") return { left: x - el.width / 2, top: y - el.height / 2, width: el.width, height: el.height };
@@ -112,6 +98,7 @@ function DesignElementView({
   isSelected,
   onPress,
   onMoveElement,
+  onUpdateElement,
   onDragStart,
   containerW,
   containerH,
@@ -120,6 +107,7 @@ function DesignElementView({
   isSelected: boolean;
   onPress: () => void;
   onMoveElement?: (id: string, x: number, y: number) => void;
+  onUpdateElement?: (id: string, patch: Record<string, any>) => void;
   onDragStart?: () => void;
   containerW: number;
   containerH: number;
@@ -128,6 +116,18 @@ function DesignElementView({
   const movedRef = useRef(false);
   const dragPositionRef = useRef<{ x: number; y: number } | null>(null);
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
+  const pinchRef = useRef<{
+    active: boolean;
+    startDist: number;
+    startW?: number;
+    startH?: number;
+    startR?: number;
+    startFont?: number;
+    startBoxW?: number;
+    startBoxH?: number;
+  }>({ active: false, startDist: 1 });
+  const pinchRafRef = useRef<number | null>(null);
+  const lastScaleRef = useRef(1);
 
   const wrapped = !!onMoveElement;
   const displayX = dragPosition?.x ?? el.x;
@@ -143,9 +143,77 @@ function DesignElementView({
           startRef.current = { x: el.x, y: el.y };
           movedRef.current = false;
           dragPositionRef.current = null;
+          pinchRef.current = { active: false, startDist: 1 };
           onDragStart?.();
         },
-        onPanResponderMove: (_, gestureState) => {
+        onPanResponderMove: (evt, gestureState) => {
+          const e = evt as unknown as { nativeEvent: { touches?: Array<{ pageX: number; pageY: number }> } };
+          const touches = e.nativeEvent.touches ?? [];
+
+          // Pinch to scale (two fingers).
+          if (touches.length >= 2 && onUpdateElement) {
+            const t0 = touches[0]!;
+            const t1 = touches[1]!;
+            const dx = t0.pageX - t1.pageX;
+            const dy = t0.pageY - t1.pageY;
+            const dist = Math.max(1, Math.hypot(dx, dy));
+
+            if (!pinchRef.current.active) {
+              pinchRef.current.active = true;
+              pinchRef.current.startDist = dist;
+              movedRef.current = true;
+              // Snapshot element size for stable scaling.
+              if (el.type === "image" || el.type === "rect") {
+                pinchRef.current.startW = el.width;
+                pinchRef.current.startH = el.height;
+              } else if (el.type === "circle") {
+                pinchRef.current.startR = el.radius;
+              } else if (el.type === "text") {
+                const { w, h } = getTextBox(el);
+                pinchRef.current.startFont = el.fontSize;
+                pinchRef.current.startBoxW = w;
+                pinchRef.current.startBoxH = h;
+              }
+            }
+
+            const scale = dist / pinchRef.current.startDist;
+            lastScaleRef.current = scale;
+
+            if (pinchRafRef.current != null) return;
+            pinchRafRef.current = requestAnimationFrame(() => {
+              pinchRafRef.current = null;
+              const s = lastScaleRef.current;
+              if (!pinchRef.current.active) return;
+
+              if (el.type === "image" || el.type === "rect") {
+                const startW = pinchRef.current.startW ?? el.width;
+                const startH = pinchRef.current.startH ?? el.height;
+                onUpdateElement(el.id, {
+                  width: clamp(Math.round(startW * s), 20, 320),
+                  height: clamp(Math.round(startH * s), 20, 320),
+                });
+              } else if (el.type === "circle") {
+                const startR = pinchRef.current.startR ?? el.radius;
+                onUpdateElement(el.id, {
+                  radius: clamp(Math.round(startR * s), 10, 200),
+                });
+              } else if (el.type === "text") {
+                const startFont = pinchRef.current.startFont ?? el.fontSize;
+                const startBoxW = pinchRef.current.startBoxW ?? getTextBox(el).w;
+                onUpdateElement(el.id, {
+                  fontSize: clamp(Math.round(startFont * s), 10, 96),
+                  boxWidth: clamp(Math.round(startBoxW * s), 80, 320),
+                });
+              }
+            });
+            return;
+          }
+
+          // If pinch ended (lift one finger), clear pinch state.
+          if (pinchRef.current.active && touches.length < 2) {
+            pinchRef.current.active = false;
+          }
+
           const { dx, dy } = gestureState;
           if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
             movedRef.current = true;
@@ -156,7 +224,9 @@ function DesignElementView({
           setDragPosition({ x: newX, y: newY });
         },
         onPanResponderRelease: () => {
-          if (movedRef.current && dragPositionRef.current) {
+          if (pinchRef.current.active) {
+            pinchRef.current.active = false;
+          } else if (movedRef.current && dragPositionRef.current) {
             onMoveElement?.(el.id, dragPositionRef.current.x, dragPositionRef.current.y);
           } else if (!movedRef.current) {
             onPress();
@@ -165,7 +235,15 @@ function DesignElementView({
           setDragPosition(null);
         },
       }),
-    [el.id, el.x, el.y, containerW, containerH, onMoveElement, onDragStart, onPress]
+    [
+      el,
+      containerW,
+      containerH,
+      onMoveElement,
+      onUpdateElement,
+      onDragStart,
+      onPress,
+    ]
   );
 
   const wrap = (node: React.ReactNode) =>
@@ -181,15 +259,16 @@ function DesignElementView({
     );
 
   if (el.type === "text") {
+    const { w, h } = getTextBox(el);
     return wrap(
       <TouchableOpacity
         style={[
           styles.elementWrap,
           {
-            left: wrapped ? 0 : el.x - 60,
-            top: wrapped ? 0 : el.y - 20,
-            width: 120,
-            height: 40,
+            left: wrapped ? 0 : el.x - w / 2,
+            top: wrapped ? 0 : el.y - h / 2,
+            width: w,
+            height: h,
             borderWidth: isSelected ? 2 : 0,
             borderColor: "#e94560",
           },
@@ -202,13 +281,21 @@ function DesignElementView({
             styles.textEl,
             {
               fontSize: el.fontSize,
+              lineHeight: Math.round(el.fontSize * 1.25),
               color: el.color,
               fontFamily: el.fontFamily,
               fontWeight: el.bold ? "bold" : "normal",
               fontStyle: el.italic ? "italic" : "normal",
             },
           ]}
-          numberOfLines={2}
+          onTextLayout={(e) => {
+            if (!onUpdateElement) return;
+            const lines = (e.nativeEvent as any).lines as Array<{ height: number }> | undefined;
+            if (!lines || !lines.length) return;
+            const total = Math.ceil(lines.reduce((sum, l) => sum + (l.height ?? 0), 0)) + 6;
+            const cur = typeof (el as any).boxHeight === "number" ? (el as any).boxHeight : DEFAULT_TEXT_H;
+            if (Math.abs(total - cur) >= 2) onUpdateElement(el.id, { boxHeight: clamp(total, 24, 260) });
+          }}
         >
           {el.text}
         </Text>
@@ -291,16 +378,17 @@ function CaptureDesignLayer({ elements }: { elements: DesignElement[] }) {
     <View style={[styles.designLayer, { width: CONTAINER_W, height: CONTAINER_H }]} pointerEvents="none">
       {elements.map((el) => {
         if (el.type === "text") {
+          const { w, h } = getTextBox(el);
           return (
             <View
               key={el.id}
               style={[
                 styles.elementWrap,
                 {
-                  left: el.x - 60,
-                  top: el.y - 20,
-                  width: 120,
-                  height: 40,
+                  left: el.x - w / 2,
+                  top: el.y - h / 2,
+                  width: w,
+                  height: h,
                 },
               ]}
             >
@@ -309,13 +397,13 @@ function CaptureDesignLayer({ elements }: { elements: DesignElement[] }) {
                   styles.textEl,
                   {
                     fontSize: el.fontSize,
+                    lineHeight: Math.round(el.fontSize * 1.25),
                     color: el.color,
                     fontFamily: el.fontFamily,
                     fontWeight: el.bold ? "bold" : "normal",
                     fontStyle: el.italic ? "italic" : "normal",
                   },
                 ]}
-                numberOfLines={2}
               >
                 {el.text}
               </Text>
@@ -388,7 +476,11 @@ function CaptureDesignLayer({ elements }: { elements: DesignElement[] }) {
 
 const DesignEditorInner = ({
   view,
-  tshirtColor,
+  bodyColor,
+  sleeveColor,
+  collarColor,
+  colorPart,
+  onColorPartChange,
   elements,
   selectedId,
   textModalVisible,
@@ -397,134 +489,189 @@ const DesignEditorInner = ({
   onViewChange,
   onColorChange,
   onAddText,
-  onAddRect,
-  onAddCircle,
+  onCliparts,
+  onTemplate,
   onAddImage,
   onTextModalClose,
   onTextModalAdd,
   onSelectElement,
   onDeleteSelected,
   onMoveElement,
+  onUpdateElement,
   onDragStart,
+  readOnly = false,
   viewShotRef,
   captureShotRef,
-}: Props & { viewShotRef: React.RefObject<ViewShot | null>; captureShotRef: React.RefObject<ViewShot | null> }) => (
-  <View style={styles.container}>
-    <View style={styles.canvasArea}>
-      {/* Capture-only view: solid color + design layer so 3D texture includes text/images (no MaskedView). */}
-      <ViewShot
-        ref={captureShotRef}
-        options={{ format: "png", result: "tmpfile" }}
-        style={[styles.captureShot, { width: CONTAINER_W, height: CONTAINER_H }]}
+}: Props & { viewShotRef: React.RefObject<ViewShot | null>; captureShotRef: React.RefObject<ViewShot | null> }) => {
+  const silhouetteSource = view === "front" ? frontImage : backImage;
+  const selectedColor = colorPart === "body" ? bodyColor : colorPart === "sleeves" ? sleeveColor : collarColor;
+  const ch = CONTAINER_H * TSHIRT_REGIONS.collarHeight;
+  const sw = CONTAINER_W * TSHIRT_REGIONS.sleeveWidth;
+  const bodyW = CONTAINER_W - sw * 2;
+  const bodyH = CONTAINER_H - ch;
+
+  const renderRegion = (color: string, key: string) =>
+    Platform.OS === "web" ? (
+      <Image
+        key={key}
+        source={silhouetteSource}
+        style={[StyleSheet.absoluteFill, styles.tshirtBg]}
+        resizeMode="contain"
+        tintColor={color}
+      />
+    ) : (
+      <MaskedView
+        key={key}
+        style={[StyleSheet.absoluteFill, styles.tshirtBg]}
+        maskElement={
+          <Image source={silhouetteSource} style={[StyleSheet.absoluteFill, styles.tshirtBg]} resizeMode="contain" />
+        }
       >
-        <View style={[StyleSheet.absoluteFill, { width: CONTAINER_W, height: CONTAINER_H, backgroundColor: tshirtColor }]} />
-        <CaptureDesignLayer elements={elements} />
-      </ViewShot>
-      <ViewShot
-        ref={viewShotRef}
-        options={{ format: "png", result: "tmpfile" }}
-        style={[styles.tshirtContainer, { width: CONTAINER_W, height: CONTAINER_H }]}
-      >
-        <View style={[StyleSheet.absoluteFill, { width: CONTAINER_W, height: CONTAINER_H }]}>
-          {(() => {
-            const silhouetteSource = view === "front" ? frontImage : backImage;
-            const displayColor = toMoreVividHex(tshirtColor);
-            return Platform.OS === "web" ? (
-              <Image
-                key={`web-${view}-${tshirtColor}`}
-                source={silhouetteSource}
-                style={[StyleSheet.absoluteFill, styles.tshirtBg]}
-                resizeMode="contain"
-                tintColor={displayColor}
-              />
-            ) : (
-              <MaskedView
-                key={`mask-${view}-${tshirtColor}`}
-                style={[StyleSheet.absoluteFill, styles.tshirtBg]}
-                maskElement={
-                  <Image
-                    source={silhouetteSource}
-                    style={[StyleSheet.absoluteFill, styles.tshirtBg]}
-                    resizeMode="contain"
-                  />
-                }
-              >
-                <View
-                  style={[
-                    StyleSheet.absoluteFill,
-                    styles.tshirtBg,
-                    { backgroundColor: displayColor, opacity: 1 },
-                  ]}
+        <View style={[StyleSheet.absoluteFill, styles.tshirtBg, { backgroundColor: color, opacity: 1 }]} />
+      </MaskedView>
+    );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.canvasArea}>
+        <ViewShot
+          ref={captureShotRef}
+          options={{ format: "png", result: "tmpfile" }}
+          style={[styles.captureShot, { width: CONTAINER_W, height: CONTAINER_H }]}
+        >
+          <View style={[StyleSheet.absoluteFill, { width: CONTAINER_W, height: CONTAINER_H, backgroundColor: "transparent" }]} />
+          <CaptureDesignLayer elements={elements} />
+        </ViewShot>
+        <ViewShot
+          ref={viewShotRef}
+          options={{ format: "png", result: "tmpfile" }}
+          style={[styles.tshirtContainer, { width: CONTAINER_W, height: CONTAINER_H }]}
+        >
+          <View style={[StyleSheet.absoluteFill, { width: CONTAINER_W, height: CONTAINER_H }]}>
+            {/* Same front/back image, 3 regions via overflow-hidden windows */}
+            {/* Collar: top strip */}
+            <View style={[styles.regionWindow, { top: 0, left: 0, width: CONTAINER_W, height: ch }]} pointerEvents="none">
+              <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: 0, top: 0 }]}>
+                {renderRegion(collarColor, `collar-${view}-${collarColor}`)}
+              </View>
+            </View>
+            {/* Body: center */}
+            <View style={[styles.regionWindow, { top: ch, left: sw, width: bodyW, height: bodyH }]} pointerEvents="none">
+              <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: -sw, top: -ch }]}>
+                {renderRegion(bodyColor, `body-${view}-${bodyColor}`)}
+              </View>
+            </View>
+            {/* Left sleeve */}
+            <View style={[styles.regionWindow, { top: ch, left: 0, width: sw, height: bodyH }]} pointerEvents="none">
+              <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: 0, top: -ch }]}>
+                {renderRegion(sleeveColor, `sleeveL-${view}-${sleeveColor}`)}
+              </View>
+            </View>
+            {/* Right sleeve */}
+            <View style={[styles.regionWindow, { top: ch, left: CONTAINER_W - sw, width: sw, height: bodyH }]} pointerEvents="none">
+              <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: -(CONTAINER_W - sw), top: -ch }]}>
+                {renderRegion(sleeveColor, `sleeveR-${view}-${sleeveColor}`)}
+              </View>
+            </View>
+            <View
+              style={[styles.designLayer, { width: CONTAINER_W, height: CONTAINER_H }]}
+              pointerEvents={readOnly ? "none" : "box-none"}
+            >
+              {elements.map((el) => (
+                <DesignElementView
+                  key={el.id}
+                  el={el}
+                  isSelected={selectedId === el.id}
+                  onPress={() => onSelectElement(selectedId === el.id ? null : el.id)}
+                  onMoveElement={onMoveElement}
+                  onUpdateElement={onUpdateElement}
+                  onDragStart={onDragStart}
+                  containerW={CONTAINER_W}
+                  containerH={CONTAINER_H}
                 />
-              </MaskedView>
-            );
-          })()}
-          <View
-            style={[styles.designLayer, { width: CONTAINER_W, height: CONTAINER_H }]}
-            pointerEvents="box-none"
-          >
-            {elements.map((el) => (
-              <DesignElementView
-                key={el.id}
-                el={el}
-                isSelected={selectedId === el.id}
-                onPress={() => onSelectElement(selectedId === el.id ? null : el.id)}
-                onMoveElement={onMoveElement}
-                onDragStart={onDragStart}
-                containerW={CONTAINER_W}
-                containerH={CONTAINER_H}
-              />
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
-      </ViewShot>
+        </ViewShot>
 
-      {selectedId ? (
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={onDeleteSelected}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.deleteBtnText}>Delete</Text>
-        </TouchableOpacity>
-      ) : null}
+        {selectedId ? (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={onDeleteSelected}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
+        ) : null}
 
-      <ColorBar selectedColor={tshirtColor} onSelectColor={onColorChange} />
+        {!readOnly && (
+          <>
+            <View style={styles.colorPartRow}>
+              <TouchableOpacity
+                style={[styles.colorPartBtn, colorPart === "body" && styles.colorPartBtnActive]}
+                onPress={() => onColorPartChange("body")}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.colorPartText, colorPart === "body" && styles.colorPartTextActive]}>Body</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.colorPartBtn, colorPart === "sleeves" && styles.colorPartBtnActive]}
+                onPress={() => onColorPartChange("sleeves")}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.colorPartText, colorPart === "sleeves" && styles.colorPartTextActive]}>Sleeves</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.colorPartBtn, colorPart === "collar" && styles.colorPartBtnActive]}
+                onPress={() => onColorPartChange("collar")}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.colorPartText, colorPart === "collar" && styles.colorPartTextActive]}>Collar</Text>
+              </TouchableOpacity>
+            </View>
+            <ColorBar selectedColor={selectedColor} onSelectColor={onColorChange} />
 
-      <View style={styles.viewSwitcher}>
-        <TouchableOpacity
-          style={[styles.viewBtn, view === "front" && styles.viewBtnActive]}
-          onPress={() => onViewChange("front")}
-        >
-          <Text style={[styles.viewBtnText, view === "front" && styles.viewBtnTextActive]}>
-            Front
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.viewBtn, view === "back" && styles.viewBtnActive]}
-          onPress={() => onViewChange("back")}
-        >
-          <Text style={[styles.viewBtnText, view === "back" && styles.viewBtnTextActive]}>
-            Back
-          </Text>
-        </TouchableOpacity>
+            <View style={styles.viewSwitcher}>
+              <TouchableOpacity
+                style={[styles.viewBtn, view === "front" && styles.viewBtnActive]}
+                onPress={() => onViewChange("front")}
+              >
+                <Text style={[styles.viewBtnText, view === "front" && styles.viewBtnTextActive]}>
+                  Front
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.viewBtn, view === "back" && styles.viewBtnActive]}
+                onPress={() => onViewChange("back")}
+              >
+                <Text style={[styles.viewBtnText, view === "back" && styles.viewBtnTextActive]}>
+                  Back
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
+
+      {!readOnly && (
+        <>
+          <Toolbar
+            onImage={onAddImage}
+            onText={onAddText}
+            onCliparts={onCliparts}
+            onTemplate={onTemplate}
+          />
+
+          <TextModal
+            visible={textModalVisible}
+            onClose={onTextModalClose}
+            onAdd={onTextModalAdd}
+          />
+        </>
+      )}
     </View>
-
-    <Toolbar
-      onImage={onAddImage}
-      onText={onAddText}
-      onShapeRect={onAddRect}
-      onShapeCircle={onAddCircle}
-    />
-
-    <TextModal
-      visible={textModalVisible}
-      onClose={onTextModalClose}
-      onAdd={onTextModalAdd}
-    />
-  </View>
-);
+  );
+};
 
 const DesignEditorWithRef = forwardRef<DesignEditorRef, Props>(function DesignEditor(props, ref) {
   const viewShotRef = useRef<ViewShot>(null);
@@ -565,6 +712,13 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  regionWindow: {
+    position: "absolute",
+    overflow: "hidden",
+  },
+  regionMaskWrap: {
+    position: "absolute",
+  },
   designLayer: {
     position: "absolute",
     top: 0,
@@ -600,6 +754,32 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "600",
+  },
+  colorPartRow: {
+    position: "absolute",
+    left: 10,
+    top: "50%",
+    transform: [{ translateY: -110 }],
+    flexDirection: "row",
+    gap: 6,
+    zIndex: 10,
+  },
+  colorPartBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: "rgba(0,0,0,0.2)",
+  },
+  colorPartBtnActive: {
+    backgroundColor: "#e94560",
+  },
+  colorPartText: {
+    fontSize: 11,
+    color: "#fff",
+    fontWeight: "500",
+  },
+  colorPartTextActive: {
+    fontWeight: "700",
   },
   viewSwitcher: {
     position: "absolute",
