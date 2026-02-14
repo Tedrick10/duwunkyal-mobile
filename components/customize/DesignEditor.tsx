@@ -17,7 +17,6 @@ import { Toolbar } from "./Toolbar";
 import { TextModal } from "./TextModal";
 
 // White t-shirt silhouette: mask reveals exact hex color only on shirt shape (native); web uses tintColor
-// const WHITE_TSHIRT_SILHOUETTE = require("@/assets/products/tshirt-white-crew.png");
 
 type Props = {
   view: DesignView;
@@ -758,10 +757,9 @@ const styles = StyleSheet.create({
   colorPartRow: {
     position: "absolute",
     left: 10,
-    top: "50%",
-    transform: [{ translateY: -110 }],
+    top: 10,
     flexDirection: "row",
-    gap: 6,
+    gap: 10,
     zIndex: 10,
   },
   colorPartBtn: {
