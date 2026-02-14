@@ -12,6 +12,8 @@ import type { CustomizationData, DesignElement } from "./types";
 import { CONTAINER_W, CONTAINER_H } from "./types";
 import { DesignEditor } from "./DesignEditor";
 import { formatPriceMMK } from "@/lib/format";
+import { TSHIRT_FRONT_SVG } from "@/lib/tshirt-front-svg";
+import { TSHIRT_BACK_SVG } from "@/lib/tshirt-back-svg";
 
 const frontImage = require("@/assets/products/tshirt-front.png");
 const backImage = require("@/assets/products/tshirt-back.png");
@@ -123,6 +125,8 @@ export function CustomDesignViewerModal({
                   textModalVisible={false}
                   frontImage={frontImage}
                   backImage={backImage}
+                  frontSvg={TSHIRT_FRONT_SVG}
+                  backSvg={TSHIRT_BACK_SVG}
                   onViewChange={(v) => setView(v)}
                   onColorChange={() => { }}
                   onAddText={() => { }}

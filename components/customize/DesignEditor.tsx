@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, forwardRef, useImperativeHandle, useState } from "react";
+import React, { useRef, useMemo, forwardRef, useImperativeHandle, useState, useDeferredValue, memo } from "react";
 import {
   View,
   Image,
@@ -11,12 +11,14 @@ import {
 } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import ViewShot from "react-native-view-shot";
+import { SvgXml } from "react-native-svg";
+import { tintSvgFills, ensureSvgFits } from "@/lib/tintSvgFills";
 import { DesignElement, DesignView, TshirtColorPart, CONTAINER_W, CONTAINER_H, TSHIRT_REGIONS } from "./types";
 import { ColorBar } from "./ColorBar";
 import { Toolbar } from "./Toolbar";
 import { TextModal } from "./TextModal";
 
-// White t-shirt silhouette: mask reveals exact hex color only on shirt shape (native); web uses tintColor
+// When frontSvg/backSvg are provided, use SVG with tinted fills (natural shading). Otherwise Image + MaskedView/tintColor.
 
 type Props = {
   view: DesignView;
@@ -30,6 +32,9 @@ type Props = {
   textModalVisible: boolean;
   frontImage: ImageSourcePropType;
   backImage: ImageSourcePropType;
+  /** Optional: SVG string (e.g. from TSHIRT_FRONT_SVG). When set, 2D view uses SVG with tinted fills for natural shading. */
+  frontSvg?: string;
+  backSvg?: string;
   onViewChange: (view: DesignView) => void;
   onColorChange: (color: string) => void;
   onAddText: () => void;
@@ -473,7 +478,7 @@ function CaptureDesignLayer({ elements }: { elements: DesignElement[] }) {
   );
 }
 
-const DesignEditorInner = ({
+const DesignEditorInner = memo(function DesignEditorInner({
   view,
   bodyColor,
   sleeveColor,
@@ -485,6 +490,8 @@ const DesignEditorInner = ({
   textModalVisible,
   frontImage,
   backImage,
+  frontSvg,
+  backSvg,
   onViewChange,
   onColorChange,
   onAddText,
@@ -501,16 +508,47 @@ const DesignEditorInner = ({
   readOnly = false,
   viewShotRef,
   captureShotRef,
-}: Props & { viewShotRef: React.RefObject<ViewShot | null>; captureShotRef: React.RefObject<ViewShot | null> }) => {
+}: Props & { viewShotRef: React.RefObject<ViewShot | null>; captureShotRef: React.RefObject<ViewShot | null> }) {
   const silhouetteSource = view === "front" ? frontImage : backImage;
+  const svgSource = view === "front" ? frontSvg : backSvg;
   const selectedColor = colorPart === "body" ? bodyColor : colorPart === "sleeves" ? sleeveColor : collarColor;
   const ch = CONTAINER_H * TSHIRT_REGIONS.collarHeight;
   const sw = CONTAINER_W * TSHIRT_REGIONS.sleeveWidth;
   const bodyW = CONTAINER_W - sw * 2;
   const bodyH = CONTAINER_H - ch;
 
-  const renderRegion = (color: string, key: string) =>
-    Platform.OS === "web" ? (
+  const svgFitted = useMemo(
+    () => (svgSource ? ensureSvgFits(svgSource) : null),
+    [svgSource]
+  );
+  const tintedCollarSvg = useMemo(
+    () => (svgFitted ? tintSvgFills(svgFitted, collarColor) : null),
+    [svgFitted, collarColor]
+  );
+  const tintedBodySvg = useMemo(
+    () => (svgFitted ? tintSvgFills(svgFitted, bodyColor) : null),
+    [svgFitted, bodyColor]
+  );
+  const tintedSleeveSvg = useMemo(
+    () => (svgFitted ? tintSvgFills(svgFitted, sleeveColor) : null),
+    [svgFitted, sleeveColor]
+  );
+
+  const renderRegion = (color: string, key: string, region: "collar" | "body" | "sleeve") => {
+    const tintedSvg =
+      region === "collar" ? tintedCollarSvg : region === "body" ? tintedBodySvg : tintedSleeveSvg;
+    if (tintedSvg) {
+      return (
+        <SvgXml
+          key={key}
+          xml={tintedSvg}
+          width={CONTAINER_W}
+          height={CONTAINER_H}
+          style={[StyleSheet.absoluteFill, styles.tshirtBg]}
+        />
+      );
+    }
+    return Platform.OS === "web" ? (
       <Image
         key={key}
         source={silhouetteSource}
@@ -529,6 +567,7 @@ const DesignEditorInner = ({
         <View style={[StyleSheet.absoluteFill, styles.tshirtBg, { backgroundColor: color, opacity: 1 }]} />
       </MaskedView>
     );
+  };
 
   return (
     <View style={styles.container}>
@@ -551,25 +590,25 @@ const DesignEditorInner = ({
             {/* Collar: top strip */}
             <View style={[styles.regionWindow, { top: 0, left: 0, width: CONTAINER_W, height: ch }]} pointerEvents="none">
               <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: 0, top: 0 }]}>
-                {renderRegion(collarColor, `collar-${view}-${collarColor}`)}
+                {renderRegion(collarColor, `collar-${view}-${collarColor}`, "collar")}
               </View>
             </View>
             {/* Body: center */}
             <View style={[styles.regionWindow, { top: ch, left: sw, width: bodyW, height: bodyH }]} pointerEvents="none">
               <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: -sw, top: -ch }]}>
-                {renderRegion(bodyColor, `body-${view}-${bodyColor}`)}
+                {renderRegion(bodyColor, `body-${view}-${bodyColor}`, "body")}
               </View>
             </View>
             {/* Left sleeve */}
             <View style={[styles.regionWindow, { top: ch, left: 0, width: sw, height: bodyH }]} pointerEvents="none">
               <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: 0, top: -ch }]}>
-                {renderRegion(sleeveColor, `sleeveL-${view}-${sleeveColor}`)}
+                {renderRegion(sleeveColor, `sleeveL-${view}-${sleeveColor}`, "sleeve")}
               </View>
             </View>
             {/* Right sleeve */}
             <View style={[styles.regionWindow, { top: ch, left: CONTAINER_W - sw, width: sw, height: bodyH }]} pointerEvents="none">
               <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: -(CONTAINER_W - sw), top: -ch }]}>
-                {renderRegion(sleeveColor, `sleeveR-${view}-${sleeveColor}`)}
+                {renderRegion(sleeveColor, `sleeveR-${view}-${sleeveColor}`, "sleeve")}
               </View>
             </View>
             <View
@@ -670,7 +709,7 @@ const DesignEditorInner = ({
       )}
     </View>
   );
-};
+});
 
 const DesignEditorWithRef = forwardRef<DesignEditorRef, Props>(function DesignEditor(props, ref) {
   const viewShotRef = useRef<ViewShot>(null);

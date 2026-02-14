@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, startTransition } from "react";
 import {
   View,
   StyleSheet,
@@ -20,6 +20,8 @@ import {
   TEMPLATE_PRICES,
 } from "@/components/customize/types";
 import { DesignEditor, type DesignEditorRef } from "@/components/customize/DesignEditor";
+import { TSHIRT_FRONT_SVG } from "@/lib/tshirt-front-svg";
+import { TSHIRT_BACK_SVG } from "@/lib/tshirt-back-svg";
 import { Preview3D } from "@/components/customize/Preview3D";
 import { ImageLibraryModal } from "@/components/customize/ImageLibraryModal";
 import type {
@@ -68,6 +70,8 @@ export default function CustomizeScreen() {
   const [redoStack, setRedoStack] = useState<DesignElement[][]>([]);
   const [addedToCart, setAddedToCart] = useState(false);
   const designEditorRef = useRef<DesignEditorRef>(null);
+  const currentElementsRef = useRef<DesignElement[]>([]);
+  currentElementsRef.current = view === "front" ? frontDesign : backDesign;
 
   const addToCartMutation = useMutation({
     mutationFn: async () => {
@@ -162,9 +166,9 @@ export default function CustomizeScreen() {
   );
 
   const pushUndo = useCallback(() => {
-    setUndoStack((s) => [...s.slice(-29), currentElements]);
+    setUndoStack((s) => [...s.slice(-29), currentElementsRef.current]);
     setRedoStack(() => []);
-  }, [currentElements]);
+  }, []);
 
   const addElement = useCallback(
     (el: DesignElement) => {
@@ -429,10 +433,21 @@ export default function CustomizeScreen() {
   const backImage = require("@/assets/products/tshirt-back.png");
 
   const handleColorChange = useCallback((color: string) => {
-    if (colorPart === "body") setTshirtBodyColor(color);
-    else if (colorPart === "sleeves") setTshirtSleeveColor(color);
-    else setTshirtCollarColor(color);
+    startTransition(() => {
+      if (colorPart === "body") setTshirtBodyColor(color);
+      else if (colorPart === "sleeves") setTshirtSleeveColor(color);
+      else setTshirtCollarColor(color);
+    });
   }, [colorPart]);
+
+  const handleViewChange = useCallback((v: DesignView) => {
+    startTransition(() => setView(v));
+  }, []);
+
+  const handleClipartsOpen = useCallback(() => setClipartsOpen(true), []);
+  const handleTemplateOpen = useCallback(() => setTemplateOpen(true), []);
+  const handleClipartsClose = useCallback(() => setClipartsOpen(false), []);
+  const handleTemplateClose = useCallback(() => setTemplateOpen(false), []);
 
   return (
     <View style={styles.container}>
@@ -475,11 +490,13 @@ export default function CustomizeScreen() {
           textModalVisible={textModalVisible}
           frontImage={frontImage}
           backImage={backImage}
-          onViewChange={setView}
+          frontSvg={TSHIRT_FRONT_SVG}
+          backSvg={TSHIRT_BACK_SVG}
+          onViewChange={handleViewChange}
           onColorChange={handleColorChange}
           onAddText={handleAddText}
-          onCliparts={() => setClipartsOpen(true)}
-          onTemplate={() => setTemplateOpen(true)}
+          onCliparts={handleClipartsOpen}
+          onTemplate={handleTemplateOpen}
           onAddImage={handleAddImage}
           onTextModalClose={handleTextModalClose}
           onTextModalAdd={handleTextModalAdd}
@@ -582,7 +599,7 @@ export default function CustomizeScreen() {
       <ImageLibraryModal
         visible={clipartsOpen}
         title="Cliparts"
-        onClose={() => setClipartsOpen(false)}
+        onClose={handleClipartsClose}
         items={CLIPART_MODULES.map((src, idx) => {
           const sourceId = `clipart-${idx + 1}`;
           return {
@@ -590,7 +607,7 @@ export default function CustomizeScreen() {
             source: src,
             price: CLIPART_PRICES[sourceId],
             onPress: async () => {
-              setClipartsOpen(false);
+              handleClipartsClose();
               await addPresetImage(src, sourceId);
             },
           };
@@ -600,7 +617,7 @@ export default function CustomizeScreen() {
       <ImageLibraryModal
         visible={templateOpen}
         title="Template"
-        onClose={() => setTemplateOpen(false)}
+        onClose={handleTemplateClose}
         items={TEMPLATE_MODULES.map((src, idx) => {
           const sourceId = `template-${idx + 1}`;
           return {
@@ -608,7 +625,7 @@ export default function CustomizeScreen() {
             source: src,
             price: TEMPLATE_PRICES[sourceId],
             onPress: async () => {
-              setTemplateOpen(false);
+              handleTemplateClose();
               await addPresetImage(src, sourceId);
             },
           };
