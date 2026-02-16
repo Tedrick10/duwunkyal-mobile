@@ -73,16 +73,9 @@ export interface UserData {
   phone: string | null;
   address: string | null;
   isAdmin: boolean;
+  photo_url?: string | null;
 }
 
-export const DUMMY_USER: UserData = {
-  id: 1,
-  email: "user@duwunkyal.com",
-  name: "Style User",
-  phone: "09-123-456-789",
-  address: "No.123, Pyay Road, Kamayut Township, Yangon",
-  isAdmin: false,
-};
 
 export const CATEGORIES: Category[] = [
   { id: 1, name: "T-Shirts", image: "/assets/products/cat-tshirts.png", createdAt: "2026-01-01T00:00:00.000Z" },

@@ -5,7 +5,6 @@ import {
   INITIAL_CART,
   INITIAL_ORDERS,
   INITIAL_WISHLIST,
-  DUMMY_USER,
   type CartItemData,
   type OrderData,
   type WishlistItemData,
@@ -14,6 +13,7 @@ import {
   type Category,
 } from "./dummy-data";
 import type { CustomizationData } from "@/components/customize/types";
+import { apiUrl } from "./api-config";
 
 const STORAGE_KEYS = {
   CART: "@duwunkyaw_cart",
@@ -75,6 +75,23 @@ async function saveWishlist() {
   if (_wishlist) await AsyncStorage.setItem(STORAGE_KEYS.WISHLIST, JSON.stringify(_wishlist));
 }
 
+async function getStoredUser(): Promise<UserData | null> {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.USER);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function setStoredUser(user: UserData | null): Promise<void> {
+  if (user) {
+    await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+  } else {
+    await AsyncStorage.removeItem(STORAGE_KEYS.USER);
+  }
+}
+
 export const LocalDataService = {
   getCategories(): Category[] {
     return CATEGORIES;
@@ -112,6 +129,8 @@ export const LocalDataService = {
     customization?: CustomizationData | null,
     customPrice?: string | null
   ): Promise<CartItemData> {
+    const user = await getStoredUser();
+    if (!user) throw new Error("Please log in to add to cart");
     const cart = await loadCart();
     const product = PRODUCTS.find((p) => p.id === productId);
     if (!product) throw new Error("Product not found");
@@ -133,7 +152,7 @@ export const LocalDataService = {
 
     const newItem: CartItemData = {
       id: _nextCartId++,
-      userId: DUMMY_USER.id,
+      userId: user.id,
       productId,
       quantity,
       size: size || null,
@@ -173,6 +192,8 @@ export const LocalDataService = {
   },
 
   async placeOrder(shippingAddress: string): Promise<OrderData> {
+    const user = await getStoredUser();
+    if (!user) throw new Error("Please log in to place an order");
     const cart = await loadCart();
     if (cart.length === 0) throw new Error("Cart is empty");
 
@@ -183,7 +204,7 @@ export const LocalDataService = {
 
     const order: OrderData = {
       id: _nextOrderId++,
-      userId: DUMMY_USER.id,
+      userId: user.id,
       total: total.toFixed(2),
       status: "pending",
       shippingAddress,
@@ -221,13 +242,15 @@ export const LocalDataService = {
   },
 
   async addToWishlist(productId: number): Promise<void> {
+    const user = await getStoredUser();
+    if (!user) throw new Error("Please log in to add to wishlist");
     const wishlist = await loadWishlist();
     if (wishlist.some((w) => w.productId === productId)) return;
     const product = PRODUCTS.find((p) => p.id === productId);
     if (!product) return;
     wishlist.push({
       id: _nextWishlistId++,
-      userId: DUMMY_USER.id,
+      userId: user.id,
       productId,
       createdAt: new Date().toISOString(),
       product,
@@ -242,15 +265,129 @@ export const LocalDataService = {
     await saveWishlist();
   },
 
-  getUser(): UserData {
-    return DUMMY_USER;
+  async getStoredUser(): Promise<UserData | null> {
+    return getStoredUser();
+  },
+
+  async setStoredUser(user: UserData | null): Promise<void> {
+    return setStoredUser(user);
   },
 
   async login(_email: string, _password: string): Promise<UserData> {
-    return DUMMY_USER;
+    const url = apiUrl("/api/auth/login");
+    const headers: HeadersInit = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+    const body = JSON.stringify({
+      email: _email,
+      password: _password,
+    });
+    const res = await fetch(url, { method: "POST", headers, body });
+    const text = await res.text();
+    if (!res.ok) {
+      let msg = "Login failed.";
+      try {
+        const data = JSON.parse(text);
+        if (data.message) msg = data.message;
+        else if (data.errors && typeof data.errors === "object") {
+          const first = Object.values(data.errors as Record<string, string[]>)[0];
+          msg = Array.isArray(first) ? first[0] : String(first);
+        }
+      } catch {
+        if (text) msg = text;
+      }
+      throw new Error(msg);
+    }
+    const data = JSON.parse(text) as {
+      user?: { id: number; name: string; email: string; phone?: string | null; address?: string | null; photo_url?: string | null };
+      customer?: { id: number; name: string; email: string; phone: string | null; photo_url?: string | null };
+    };
+    const u = data.user ?? data.customer;
+    if (!u) throw new Error("Invalid response from server.");
+    const user: UserData = {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone ?? null,
+      address: "address" in u ? (u.address ?? null) : null,
+      isAdmin: false,
+      photo_url: u.photo_url ?? null,
+    };
+    return user;
   },
 
-  async register(_email: string, _password: string, _name: string, _phone?: string): Promise<UserData> {
-    return DUMMY_USER;
+  async register(
+    _email: string,
+    _password: string,
+    _passwordConfirmation: string,
+    _name: string,
+    _phone?: string,
+    _photoUri?: string
+  ): Promise<UserData> {
+    const url = apiUrl("/api/auth/register");
+    let res: Response;
+    if (_photoUri) {
+      const formData = new FormData();
+      formData.append("name", _name);
+      formData.append("email", _email);
+      formData.append("password", _password);
+      formData.append("password_confirmation", _passwordConfirmation);
+      formData.append("phone", _phone?.trim() || "");
+      formData.append("photo", {
+        uri: _photoUri,
+        name: "photo.jpg",
+        type: "image/jpeg",
+      } as unknown as Blob);
+      res = await fetch(url, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: formData,
+      });
+    } else {
+      const headers: HeadersInit = {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      };
+      const body = JSON.stringify({
+        name: _name,
+        email: _email,
+        password: _password,
+        password_confirmation: _passwordConfirmation,
+        phone: _phone?.trim() || "",
+      });
+      res = await fetch(url, { method: "POST", headers, body });
+    }
+    const text = await res.text();
+    if (!res.ok) {
+      let msg = "Registration failed.";
+      try {
+        const data = JSON.parse(text);
+        if (data.message) msg = data.message;
+        else if (data.errors && typeof data.errors === "object") {
+          const first = Object.values(data.errors as Record<string, string[]>)[0];
+          msg = Array.isArray(first) ? first[0] : String(first);
+        }
+      } catch {
+        if (text) msg = text;
+      }
+      throw new Error(msg);
+    }
+    const data = JSON.parse(text) as {
+      message?: string;
+      customer?: { id: number; name: string; email: string; phone: string | null; photo_url?: string | null };
+    };
+    const customer = data.customer;
+    if (!customer) throw new Error("Invalid response from server.");
+    const user: UserData = {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone ?? null,
+      address: null,
+      isAdmin: false,
+      photo_url: customer.photo_url ?? null,
+    };
+    return user;
   },
 };

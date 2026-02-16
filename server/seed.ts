@@ -7,7 +7,6 @@ import {
   INITIAL_CART,
   INITIAL_ORDERS,
   INITIAL_WISHLIST,
-  DUMMY_USER,
 } from "../lib/dummy-data";
 
 async function seed() {
@@ -19,14 +18,20 @@ async function seed() {
     process.exit(0);
   }
 
-  // 1. Users: Dummy user first (id=1), then Admin
+  // 1. Users: Default seed user (id=1), then Admin
+  const seedUser = {
+    email: "user@duwunkyal.com",
+    name: "Style User",
+    phone: "09-123-456-789",
+    address: "No.123, Pyay Road, Kamayut Township, Yangon",
+  };
   const dummyPassword = await bcrypt.hash("user123", 10);
   await db.insert(users).values({
-    email: DUMMY_USER.email,
+    email: seedUser.email,
     password: dummyPassword,
-    name: DUMMY_USER.name,
-    phone: DUMMY_USER.phone,
-    address: DUMMY_USER.address,
+    name: seedUser.name,
+    phone: seedUser.phone,
+    address: seedUser.address,
     isAdmin: false,
   });
 

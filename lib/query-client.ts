@@ -1,5 +1,6 @@
 import type { ImageSourcePropType } from "react-native";
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { API_BASE_URL } from "./api-config";
 import { LocalDataService } from "./local-data-service";
 
 const DEFAULT_PRODUCT_IMAGE = require("../assets/products/tshirt-default.png");
@@ -81,10 +82,7 @@ export function getListingImageAndColor(product: {
 }
 
 export function getApiUrl(): string {
-  let host = process.env.EXPO_PUBLIC_DOMAIN;
-  if (!host || host === "undefined" || host === "null") return "http://localhost:5000";
-  const protocol = host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https";
-  return `${protocol}://${host}`;
+  return API_BASE_URL;
 }
 
 export function getProductImageSource(path: string | null | undefined): ImageSourcePropType {
@@ -154,7 +152,7 @@ export const getQueryFn: <T>(options: {
       const route = queryKey.join("/");
 
       if (route === "/api/auth/me") {
-        return LocalDataService.getUser() as any;
+        return (await LocalDataService.getStoredUser()) as any;
       }
 
       if (route === "/api/categories") {

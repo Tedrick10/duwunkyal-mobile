@@ -9,9 +9,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
+  Alert,
 } from "react-native";
 import { Link, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/lib/auth-context";
 import Colors from "@/constants/colors";
@@ -22,13 +25,33 @@ export default function RegisterScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+
+  async function pickPhoto() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission", "Gallery access is needed to add a profile photo.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setPhotoUri(result.assets[0].uri);
+    }
+  }
 
   async function handleRegister() {
-    if (!name.trim() || !email.trim() || !password.trim()) {
+    if (!name.trim() || !email.trim() || !password.trim() || !passwordConfirmation.trim()) {
       setError("Please fill in all required fields");
       return;
     }
@@ -36,10 +59,21 @@ export default function RegisterScreen() {
       setError("Password must be at least 6 characters");
       return;
     }
+    if (password !== passwordConfirmation) {
+      setError("Passwords do not match");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      await register(email.trim(), password, name.trim(), phone.trim() || undefined);
+      await register(
+        email.trim(),
+        password,
+        passwordConfirmation,
+        name.trim(),
+        phone.trim() || undefined,
+        photoUri ?? undefined
+      );
       router.dismissAll();
     } catch (e: any) {
       setError(e.message);
@@ -59,9 +93,23 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.headerSection}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="person-add-outline" size={36} color={Colors.accent} />
-          </View>
+          <Pressable onPress={pickPhoto} style={styles.photoContainer}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.photoImage} />
+            ) : (
+              <Ionicons name="camera-outline" size={32} color={Colors.accent} />
+            )}
+            <View style={styles.photoBadge}>
+              <Ionicons name="camera" size={14} color={Colors.white} />
+            </View>
+          </Pressable>
+          {photoUri ? (
+            <Pressable onPress={() => setPhotoUri(null)} style={styles.removePhotoBtn}>
+              <Text style={styles.removePhotoText}>Remove photo</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.photoHint}>Tap to upload profile photo</Text>
+          )}
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>Join DUWUN KYAL today</Text>
         </View>
@@ -80,7 +128,7 @@ export default function RegisterScreen() {
               <Ionicons name="person-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="John Doe"
+                placeholder="Enter Your Full Name"
                 placeholderTextColor={Colors.textLight}
                 value={name}
                 onChangeText={setName}
@@ -94,7 +142,7 @@ export default function RegisterScreen() {
               <Ionicons name="mail-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="your@email.com"
+                placeholder="Enter Your Email"
                 placeholderTextColor={Colors.textLight}
                 value={email}
                 onChangeText={setEmail}
@@ -111,7 +159,7 @@ export default function RegisterScreen() {
               <Ionicons name="call-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="+1 234 567 8900"
+                placeholder="Enter Your Phone Number"
                 placeholderTextColor={Colors.textLight}
                 value={phone}
                 onChangeText={setPhone}
@@ -126,7 +174,7 @@ export default function RegisterScreen() {
               <Ionicons name="lock-closed-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Min 6 characters"
+                placeholder="Min 8 characters"
                 placeholderTextColor={Colors.textLight}
                 value={password}
                 onChangeText={setPassword}
@@ -135,6 +183,28 @@ export default function RegisterScreen() {
               <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
                 <Ionicons
                   name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={Colors.textLight}
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Confirm Password *</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="lock-closed-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Re-enter password"
+                placeholderTextColor={Colors.textLight}
+                value={passwordConfirmation}
+                onChangeText={setPasswordConfirmation}
+                secureTextEntry={!showPasswordConfirmation}
+              />
+              <Pressable onPress={() => setShowPasswordConfirmation(!showPasswordConfirmation)} style={styles.eyeBtn}>
+                <Ionicons
+                  name={showPasswordConfirmation ? "eye-off-outline" : "eye-outline"}
                   size={20}
                   color={Colors.textLight}
                 />
@@ -176,6 +246,44 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { flexGrow: 1, padding: 24 },
   headerSection: { alignItems: "center", marginTop: 12, marginBottom: 28 },
+  photoContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: `${Colors.accent}15`,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    overflow: "hidden",
+  },
+  photoImage: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+  },
+  photoBadge: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginBottom: 12,
+  },
+  removePhotoBtn: { marginBottom: 12 },
+  removePhotoText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.error,
+  },
   iconContainer: {
     width: 72,
     height: 72,

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
   Switch,
+  Image,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
+import { getImageUrl } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
 import { formatPriceMMK } from "@/lib/format";
 
@@ -113,7 +115,14 @@ export default function ProfileScreen() {
 
       <View style={[styles.profileCard, { backgroundColor: C.surface, borderColor: C.borderLight }]}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
+          {user.photo_url ? (
+            <Image
+              source={{ uri: getImageUrl(user.photo_url) }}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <Text style={styles.avatarText}>{initials}</Text>
+          )}
         </View>
         <View style={styles.profileInfo}>
           <Text style={[styles.profileName, { color: C.text }]}>{user.name}</Text>
@@ -285,6 +294,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   avatarText: {
     fontSize: 20,
