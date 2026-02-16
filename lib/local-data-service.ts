@@ -274,7 +274,7 @@ export const LocalDataService = {
   },
 
   async login(_email: string, _password: string): Promise<UserData> {
-    const url = apiUrl("/api/auth/login");
+    const url = apiUrl("/api/auth/customer/login");
     const headers: HeadersInit = {
       Accept: "application/json",
       "Content-Type": "application/json",
@@ -288,17 +288,21 @@ export const LocalDataService = {
     if (!res.ok) {
       let msg = "Login failed.";
       try {
+        if (text.trim().startsWith("<")) throw new Error("Server returned HTML");
         const data = JSON.parse(text);
         if (data.message) msg = data.message;
         else if (data.errors && typeof data.errors === "object") {
           const first = Object.values(data.errors as Record<string, string[]>)[0];
           msg = Array.isArray(first) ? first[0] : String(first);
         }
-      } catch {
-        if (text) msg = text;
+      } catch (e) {
+        if (e instanceof SyntaxError || (e as Error).message === "Server returned HTML") {
+          msg = "Invalid credentials or server error. Please try again.";
+        } else if (text && !text.trim().startsWith("<")) msg = text;
       }
       throw new Error(msg);
     }
+    if (text.trim().startsWith("<")) throw new Error("Invalid response from server.");
     const data = JSON.parse(text) as {
       user?: { id: number; name: string; email: string; phone?: string | null; address?: string | null; photo_url?: string | null };
       customer?: { id: number; name: string; email: string; phone: string | null; photo_url?: string | null };

@@ -19,7 +19,6 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { getImageUrl } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
-import { formatPriceMMK } from "@/lib/format";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -89,17 +88,6 @@ export default function ProfileScreen() {
     logout();
   }
 
-  function getStatusColor(status: string): string {
-    switch (status) {
-      case "pending": return Colors.warning;
-      case "confirmed": return "#2196F3";
-      case "shipped": return "#4CAF50";
-      case "delivered": return "#9C27B0";
-      case "cancelled": return Colors.error;
-      default: return Colors.textSecondary;
-    }
-  }
-
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: C.background }]}
@@ -113,7 +101,17 @@ export default function ProfileScreen() {
         <Text style={[styles.headerTitle, { color: C.text }]}>Profile</Text>
       </View>
 
-      <View style={[styles.profileCard, { backgroundColor: C.surface, borderColor: C.borderLight }]}>
+      <Pressable
+        style={({ pressed }) => [
+          styles.profileCard,
+          { backgroundColor: C.surface, borderColor: C.borderLight },
+          pressed && { opacity: 0.9 },
+        ]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push("/profile/details");
+        }}
+      >
         <View style={styles.avatar}>
           {user.photo_url ? (
             <Image
@@ -128,63 +126,24 @@ export default function ProfileScreen() {
           <Text style={[styles.profileName, { color: C.text }]}>{user.name}</Text>
           <Text style={[styles.profileEmail, { color: C.textSecondary }]}>{user.email}</Text>
         </View>
-      </View>
+        <Ionicons name="chevron-forward" size={20} color={C.textLight} />
+      </Pressable>
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: C.text }]}>
-          My Orders {orders ? `(${orders.length})` : ""}
-        </Text>
-        {loadingOrders ? (
-          <ActivityIndicator style={{ marginTop: 20 }} color={C.accent} />
-        ) : !orders || orders.length === 0 ? (
-          <View style={styles.emptyOrders}>
-            <Ionicons name="receipt-outline" size={36} color={C.textLight} />
-            <Text style={[styles.emptyOrdersText, { color: C.textSecondary }]}>No orders yet</Text>
-          </View>
-        ) : (
-          orders.map((order: any) => (
-            <Pressable
-              key={order.id}
-              style={({ pressed }) => [styles.orderCard, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.9 }]}
-              onPress={() =>
-                router.push({
-                  pathname: "/order/[id]",
-                  params: { id: order.id.toString() },
-                })
-              }
-            >
-              <View style={styles.orderCardTop}>
-                <Text style={[styles.orderNumber, { color: C.text }]}>Order #{order.id}</Text>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: `${getStatusColor(order.status)}20` },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.statusText,
-                      { color: getStatusColor(order.status) },
-                    ]}
-                  >
-                    {order.status}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.orderCardBottom}>
-                <Text style={[styles.orderDate, { color: C.textSecondary }]}>
-                  {new Date(order.createdAt).toLocaleDateString()}
-                </Text>
-                <Text style={[styles.orderTotal, { color: C.text }]}>
-                  {formatPriceMMK(order.total)}
-                </Text>
-              </View>
-            </Pressable>
-          ))
-        )}
-      </View>
-
-      <View style={styles.section}>
+        <Pressable
+          style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.85 }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/orders");
+          }}
+        >
+          <Ionicons name="receipt-outline" size={22} color={C.accent} />
+          <Text style={[styles.menuItemText, { color: C.text, flex: 1 }]}>My Orders</Text>
+          {orders !== undefined && orders.length > 0 && (
+            <Text style={[styles.menuItemBadge, { color: C.textSecondary }]}>{orders.length}</Text>
+          )}
+          <Ionicons name="chevron-forward" size={18} color={C.textLight} />
+        </Pressable>
         <Pressable
           style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.85 }]}
           onPress={() => {
@@ -306,7 +265,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: Colors.white,
   },
-  profileInfo: { marginLeft: 14 },
+  profileInfo: { marginLeft: 14, flex: 1 },
   profileName: {
     fontSize: 18,
     fontFamily: "Inter_600SemiBold",
@@ -392,5 +351,10 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
+  },
+  menuItemBadge: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    marginRight: 4,
   },
 });

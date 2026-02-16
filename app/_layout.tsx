@@ -48,6 +48,14 @@ function RootLayoutNav() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="orders"
+        options={{ title: "My Orders", headerBackTitle: "Back" }}
+      />
+      <Stack.Screen
+        name="profile/details"
+        options={{ title: "Personal Information", headerBackTitle: "Profile" }}
+      />
+      <Stack.Screen
         name="customize/[id]"
         options={{ headerShown: false }}
       />
