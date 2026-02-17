@@ -13,13 +13,14 @@ import {
   type Category,
 } from "./dummy-data";
 import type { CustomizationData } from "@/components/customize/types";
-import { apiUrl } from "./api-config";
+import { apiUrl, apiMobileUrl } from "@/lib/api-config";
 
 const STORAGE_KEYS = {
   CART: "@duwunkyaw_cart",
   ORDERS: "@duwunkyaw_orders",
   WISHLIST: "@duwunkyaw_wishlist",
   USER: "@duwunkyaw_user",
+  TOKEN: "@duwunkyaw_token",
   LOGGED_IN: "@duwunkyaw_logged_in",
 };
 
@@ -89,6 +90,22 @@ async function setStoredUser(user: UserData | null): Promise<void> {
     await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
   } else {
     await AsyncStorage.removeItem(STORAGE_KEYS.USER);
+  }
+}
+
+async function getStoredToken(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+  } catch {
+    return null;
+  }
+}
+
+async function setStoredToken(token: string | null): Promise<void> {
+  if (token) {
+    await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token);
+  } else {
+    await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
   }
 }
 
@@ -274,7 +291,7 @@ export const LocalDataService = {
   },
 
   async login(_email: string, _password: string): Promise<UserData> {
-    const url = apiUrl("/api/auth/customer/login");
+    const url = apiMobileUrl("customerLogin");
     const headers: HeadersInit = {
       Accept: "application/json",
       "Content-Type": "application/json",
@@ -306,9 +323,13 @@ export const LocalDataService = {
     const data = JSON.parse(text) as {
       user?: { id: number; name: string; email: string; phone?: string | null; address?: string | null; photo_url?: string | null };
       customer?: { id: number; name: string; email: string; phone: string | null; photo_url?: string | null };
+      token?: string;
+      access_token?: string;
     };
     const u = data.user ?? data.customer;
     if (!u) throw new Error("Invalid response from server.");
+    const token = data.token ?? data.access_token ?? null;
+    if (token) await setStoredToken(token);
     const user: UserData = {
       id: u.id,
       name: u.name,
@@ -329,7 +350,7 @@ export const LocalDataService = {
     _phone?: string,
     _photoUri?: string
   ): Promise<UserData> {
-    const url = apiUrl("/api/auth/register");
+    const url = apiMobileUrl("customerSignup");
     let res: Response;
     if (_photoUri) {
       const formData = new FormData();
@@ -380,9 +401,13 @@ export const LocalDataService = {
     const data = JSON.parse(text) as {
       message?: string;
       customer?: { id: number; name: string; email: string; phone: string | null; photo_url?: string | null };
+      token?: string;
+      access_token?: string;
     };
     const customer = data.customer;
     if (!customer) throw new Error("Invalid response from server.");
+    const token = data.token ?? data.access_token ?? null;
+    if (token) await setStoredToken(token);
     const user: UserData = {
       id: customer.id,
       name: customer.name,
@@ -392,6 +417,96 @@ export const LocalDataService = {
       isAdmin: false,
       photo_url: customer.photo_url ?? null,
     };
+    return user;
+  },
+
+  async getStoredToken(): Promise<string | null> {
+    return getStoredToken();
+  },
+
+  async setStoredToken(token: string | null): Promise<void> {
+    return setStoredToken(token);
+  },
+
+  async updateCustomer(updates: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+    password_confirmation?: string;
+    photoUri?: string;
+  }): Promise<UserData> {
+    const url = apiMobileUrl("customerUpdate");
+    const token = await getStoredToken();
+    let res: Response;
+    if (updates.photoUri) {
+      const formData = new FormData();
+      formData.append("name", updates.name ?? "");
+      formData.append("email", updates.email ?? "");
+      formData.append("phone", updates.phone ?? "");
+      if (updates.password) {
+        formData.append("password", updates.password);
+        formData.append("password_confirmation", updates.password_confirmation ?? "");
+      }
+      formData.append("photo", {
+        uri: updates.photoUri,
+        name: "photo.jpg",
+        type: "image/jpeg",
+      } as unknown as Blob);
+      res = await fetch(url, {
+        method: "PATCH",
+        headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: formData,
+      });
+    } else {
+      const headers: HeadersInit = {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const body = JSON.stringify({
+        name: updates.name,
+        email: updates.email,
+        phone: updates.phone ?? "",
+        ...(updates.password ? { password: updates.password, password_confirmation: updates.password_confirmation } : {}),
+      });
+      res = await fetch(url, { method: "PATCH", headers, body });
+    }
+    const text = await res.text();
+    if (!res.ok) {
+      let msg = "Update failed.";
+      try {
+        if (text.trim().startsWith("<")) throw new Error("Server returned HTML");
+        const data = JSON.parse(text);
+        if (data.message) msg = data.message;
+        else if (data.errors && typeof data.errors === "object") {
+          const first = Object.values(data.errors as Record<string, string[]>)[0];
+          msg = Array.isArray(first) ? first[0] : String(first);
+        }
+      } catch (e) {
+        if (e instanceof SyntaxError || (e as Error).message === "Server returned HTML") {
+          msg = "Invalid response. Please try again.";
+        } else if (text && !text.trim().startsWith("<")) msg = text;
+      }
+      throw new Error(msg);
+    }
+    if (text.trim().startsWith("<")) throw new Error("Invalid response from server.");
+    const data = JSON.parse(text) as {
+      user?: { id: number; name: string; email: string; phone?: string | null; address?: string | null; photo_url?: string | null };
+      customer?: { id: number; name: string; email: string; phone: string | null; photo_url?: string | null };
+    };
+    const u = data.user ?? data.customer;
+    if (!u) throw new Error("Invalid response from server.");
+    const user: UserData = {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone ?? null,
+      address: "address" in u ? (u.address ?? null) : null,
+      isAdmin: false,
+      photo_url: u.photo_url ?? null,
+    };
+    await setStoredUser(user);
     return user;
   },
 };

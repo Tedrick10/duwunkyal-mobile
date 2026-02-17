@@ -28,15 +28,10 @@ import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { formatPriceMMK } from "@/lib/format";
-import { getCategoryImageSource, getListingImageAndColor } from "@/lib/query-client";
+import { type CategoryItem, type ProductListItem } from "@/lib/query-client";
+import { apiMobileUrl } from "@/lib/api-config";
 
-const BANNER_IMAGES: { id: string; image: number }[] = [
-  { id: "banner-0", image: require("@/assets/products/banner1.png") },
-  { id: "banner-1", image: require("@/assets/products/banner2.png") },
-  { id: "banner-2", image: require("@/assets/products/banner3.png") },
-  { id: "banner-3", image: require("@/assets/products/banner4.png") },
-  { id: "banner-4", image: require("@/assets/products/banner5.png") },
-];
+export type BannerItem = { id: number; image_url: string };
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48 - 12) / 2;
@@ -69,20 +64,48 @@ export default function HomeScreen() {
   const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const userInteracting = useRef(false);
 
-  const { data: featured, isLoading: loadingFeatured, refetch: refetchFeatured } = useQuery<any[]>({
-    queryKey: ["/api/products/featured"],
+  const { data: categoryData, isLoading: loadingCategories, refetch: refetchCategories } = useQuery<{ categories: CategoryItem[] }>({
+    queryKey: ["categoryList"],
+  });
+  const categories: CategoryItem[] = categoryData?.categories ?? [];
+
+  const { data: productListData, isLoading: loadingProductList, refetch: refetchProductList } = useQuery<{
+    products: ProductListItem[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  }>({
+    queryKey: ["productList"],
+  });
+  const products: ProductListItem[] = productListData?.products ?? [];
+
+  const { data: featuredProductListData, isLoading: loadingFeaturedProductList, refetch: refetchFeaturedProductList } = useQuery<{
+    products: ProductListItem[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  }>({
+    queryKey: ["featuredProductList"],
+  });
+  const hotProducts: ProductListItem[] = featuredProductListData?.products ?? [];
+
+  const { data: bannerData, refetch: refetchBanners } = useQuery<{ banners: BannerItem[] }>({
+    queryKey: ["bannerList"],
+    queryFn: async () => {
+      const res = await fetch(apiMobileUrl("bannerList"), {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error("Banner list failed");
+      const json = await res.json();
+      return { banners: json.banners ?? [] };
+    },
   });
 
-  const { data: categories, isLoading: loadingCategories, refetch: refetchCategories } = useQuery<any[]>({
-    queryKey: ["/api/categories"],
-  });
-
-  const { data: products, isLoading: loadingProducts, refetch: refetchProducts } = useQuery<any[]>({
-    queryKey: ["/api/products"],
-  });
-
-  const isLoading = loadingFeatured || loadingCategories || loadingProducts;
-  const bannerItems = BANNER_IMAGES;
+  const isLoading = loadingCategories || loadingProductList || loadingFeaturedProductList;
+  const bannerItems: BannerItem[] = bannerData?.banners ?? [];
 
   const startAutoScroll = useCallback(() => {
     if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
@@ -118,9 +141,10 @@ export default function HomeScreen() {
   );
 
   function onRefresh() {
-    refetchFeatured();
     refetchCategories();
-    refetchProducts();
+    refetchProductList();
+    refetchFeaturedProductList();
+    refetchBanners();
   }
 
   if (isLoading) {
@@ -132,9 +156,9 @@ export default function HomeScreen() {
     );
   }
 
-  const renderBannerItem = ({ item }: { item: (typeof BANNER_IMAGES)[0] }) => (
+  const renderBannerItem = ({ item }: { item: BannerItem }) => (
     <View style={styles.heroBanner}>
-      <Image source={item.image} style={styles.heroImage} resizeMode="cover" />
+      <Image source={{ uri: item.image_url }} style={styles.heroImage} resizeMode="cover" />
     </View>
   );
 
@@ -172,7 +196,7 @@ export default function HomeScreen() {
             ref={bannerRef}
             data={bannerItems}
             renderItem={renderBannerItem}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => String(item.id)}
             horizontal
             showsHorizontalScrollIndicator={false}
             snapToInterval={BANNER_WIDTH + BANNER_GAP}
@@ -205,15 +229,15 @@ export default function HomeScreen() {
             <Text style={[styles.sectionTitle, { color: C.text }]}>Categories</Text>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesRow}>
-            {categories.map((cat: any) => (
+            {categories.map((cat) => (
               <Pressable
                 key={cat.id}
                 style={({ pressed }) => [styles.categoryChip, { backgroundColor: C.surface, borderColor: C.border }, pressed && { opacity: 0.85 }]}
                 onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat.id.toString() } })}
               >
-                {cat.image ? (
+                {cat.image_url ? (
                   <View style={[styles.categoryChipImageWrap, { backgroundColor: C.productImageBg ?? "#ffffff" }]}>
-                    <Image source={getCategoryImageSource(cat.image)} style={styles.categoryChipImage} resizeMode="contain" />
+                    <Image source={{ uri: cat.image_url }} style={styles.categoryChipImage} resizeMode="contain" />
                   </View>
                 ) : null}
                 <Text style={[styles.categoryChipText, { color: C.text }]} numberOfLines={1}>{cat.name}</Text>
@@ -223,48 +247,48 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {featured && featured.length > 1 && (
+      {hotProducts.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: C.text }]}>Hot Right Now</Text>
+            <Text style={[styles.sectionTitle, { color: C.text }]}>Hot Product List</Text>
             <Ionicons name="flame" size={18} color={Colors.accent} />
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredRow}>
-            {featured.slice(1).map((product: any) => (
+            {hotProducts.map((product) => (
               <Pressable
                 key={product.id}
                 style={({ pressed }) => [styles.featuredCard, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.9 }]}
-                onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString(), color: getListingImageAndColor(product).color ?? undefined } })}
+                onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
                 <View style={[styles.featuredImageContainer, { backgroundColor: C.surface }]}>
-                  <Image source={getListingImageAndColor(product).imageSource} style={styles.featuredImage} resizeMode="contain" />
+                  <Image source={{ uri: product.image_url }} style={styles.featuredImage} resizeMode="contain" />
                 </View>
                 <Text style={[styles.featuredName, { color: C.text }]} numberOfLines={1}>{product.name}</Text>
-                <Text style={styles.featuredPrice}>{formatPriceMMK(product.price)}</Text>
+                <Text style={styles.featuredPrice}>{formatPriceMMK(product.sale_price ?? product.price)}</Text>
               </Pressable>
             ))}
           </ScrollView>
         </View>
       )}
 
-      {products && products.length > 0 && (
+      {products.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: C.text }]}>All Products</Text>
           </View>
           <View style={styles.productsGrid}>
-            {products.map((product: any) => (
+            {products.map((product) => (
               <Pressable
                 key={product.id}
                 style={({ pressed }) => [styles.productCard, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.9 }]}
-                onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString(), color: getListingImageAndColor(product).color ?? undefined } })}
+                onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
                 <View style={[styles.productImageContainer, { backgroundColor: C.surface }]}>
-                  <Image source={getListingImageAndColor(product).imageSource} style={styles.productImage} resizeMode="contain" />
+                  <Image source={{ uri: product.image_url }} style={styles.productImage} resizeMode="contain" />
                 </View>
                 <View style={styles.productInfo}>
                   <Text style={[styles.productName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
-                  <Text style={styles.productPrice}>{formatPriceMMK(product.price)}</Text>
+                  <Text style={styles.productPrice}>{formatPriceMMK(product.sale_price ?? product.price)}</Text>
                 </View>
               </Pressable>
             ))}

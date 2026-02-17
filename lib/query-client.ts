@@ -1,7 +1,49 @@
 import type { ImageSourcePropType } from "react-native";
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { API_BASE_URL } from "./api-config";
+import { API_BASE_URL, apiMobileUrl } from "@/lib/api-config";
 import { LocalDataService } from "./local-data-service";
+
+export type CategoryItem = { id: number; name: string; slug: string; parent_id: number | null; image_url: string };
+
+export type ProductListItem = {
+  id: number;
+  name: string;
+  slug: string;
+  category_id: number;
+  category: { id: number; name: string; slug: string };
+  image_url: string;
+  price: number;
+  sale_price: number | null;
+  featured: boolean;
+};
+
+export type ProductDetailSize = { id: number; name: string };
+export type ProductDetailColor = {
+  id: number;
+  color_id: number;
+  name: string;
+  hex: string;
+  price_delta: number;
+  image_url: string | null;
+};
+export type ProductDetail = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  image_url: string;
+  category_id: number;
+  category: { id: number; name: string; slug: string };
+  price: number;
+  sale_price: number | null;
+  rentals_price: number | null;
+  wholesale_price: number | null;
+  stock: number;
+  featured: boolean;
+  sizes: ProductDetailSize[];
+  colors: ProductDetailColor[];
+  model_3d_id: number | null;
+};
 
 const DEFAULT_PRODUCT_IMAGE = require("../assets/products/tshirt-default.png");
 
@@ -155,8 +197,78 @@ export const getQueryFn: <T>(options: {
         return (await LocalDataService.getStoredUser()) as any;
       }
 
+      if (route === "categoryList") {
+        const res = await fetch(apiMobileUrl("categoryList"), {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error("Category list failed");
+        const json = await res.json();
+        return { categories: json.categories ?? [] } as { categories: CategoryItem[] };
+      }
+
       if (route === "/api/categories") {
         return LocalDataService.getCategories() as any;
+      }
+
+      if (route.startsWith("productDetail/")) {
+        const productId = route.replace("productDetail/", "");
+        const res = await fetch(apiMobileUrl(`productDetail/${productId}`), {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error("Product detail failed");
+        const json = await res.json();
+        return (json.product ?? null) as ProductDetail | null;
+      }
+
+      if (route === "productList") {
+        const res = await fetch(apiMobileUrl("productList"), {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error("Product list failed");
+        const json = await res.json();
+        return {
+          products: json.products ?? [],
+          current_page: json.current_page ?? 1,
+          last_page: json.last_page ?? 1,
+          per_page: json.per_page ?? 15,
+          total: json.total ?? 0,
+        } as { products: ProductListItem[]; current_page: number; last_page: number; per_page: number; total: number };
+      }
+
+      if (route === "featuredProductList") {
+        const res = await fetch(apiMobileUrl("featuredProductList"), {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error("Featured product list failed");
+        const json = await res.json();
+        return {
+          products: json.products ?? [],
+          current_page: json.current_page ?? 1,
+          last_page: json.last_page ?? 1,
+          per_page: json.per_page ?? 15,
+          total: json.total ?? 0,
+        } as { products: ProductListItem[]; current_page: number; last_page: number; per_page: number; total: number };
+      }
+
+      if (route.startsWith("productListByCategory/")) {
+        const categoryId = route.replace("productListByCategory/", "");
+        const res = await fetch(apiMobileUrl(`productList?category_id=${categoryId}`), {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error("Category product list failed");
+        const json = await res.json();
+        return {
+          products: json.products ?? [],
+          current_page: json.current_page ?? 1,
+          last_page: json.last_page ?? 1,
+          per_page: json.per_page ?? 15,
+          total: json.total ?? 0,
+        } as { products: ProductListItem[]; current_page: number; last_page: number; per_page: number; total: number };
       }
 
       if (route === "/api/products") {

@@ -17,34 +17,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, queryClient, getImageUrl, getProductImageSource, getTshirtImageForColor } from "@/lib/query-client";
+import { apiRequest, queryClient, getProductImageSource, type ProductDetail, type ProductDetailColor } from "@/lib/query-client";
 import { formatPriceMMK } from "@/lib/format";
 
 const { width } = Dimensions.get("window");
-
-/** Map color names (e.g. White, Black, Green, Blue) to hex for swatch display. */
-const COLOR_NAME_TO_HEX: Record<string, string> = {
-  White: "#ffffff",
-  Black: "#000000",
-  Green: "#2e7d32",
-  Blue: "#1976d2",
-  Red: "#c62828",
-  Navy: "#1a237e",
-  Grey: "#616161",
-  Pink: "#ad1457",
-  Yellow: "#f9a825",
-  Orange: "#ef6c00",
-  Beige: "#d7ccc8",
-  Brown: "#5d4037",
-};
-
-function getColorHex(name: string): string {
-  const key = name.trim();
-  if (key.startsWith("#")) return key;
-  const lower = key.toLowerCase();
-  const found = Object.entries(COLOR_NAME_TO_HEX).find(([k]) => k.toLowerCase() === lower);
-  return found ? found[1] : "#9e9e9e";
-}
 
 export default function ProductDetailScreen() {
   const { id, color: paramColor } = useLocalSearchParams<{ id: string; color?: string }>();
@@ -58,8 +34,8 @@ export default function ProductDetailScreen() {
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
 
-  const { data: product, isLoading } = useQuery<any>({
-    queryKey: ["/api/products", id],
+  const { data: product, isLoading } = useQuery<ProductDetail | null>({
+    queryKey: ["productDetail", id],
   });
 
   const { data: wishlistStatus } = useQuery<{ inWishlist: boolean }>({
@@ -101,8 +77,9 @@ export default function ProductDetailScreen() {
     },
   });
 
-  const sizes = product?.sizes ? product.sizes.split(",").map((s: string) => s.trim()) : [];
-  const colors = product?.colors ? product.colors.split(",").map((c: string) => c.trim()) : [];
+  const sizes = product?.sizes?.map((s) => s.name) ?? [];
+  const colors: ProductDetailColor[] = product?.colors ?? [];
+  const selectedColorObj = colors.find((c) => c.name === selectedColor);
 
   useEffect(() => {
     initialColorSetRef.current = false;
@@ -110,13 +87,12 @@ export default function ProductDetailScreen() {
 
   useEffect(() => {
     if (!product || initialColorSetRef.current || !paramColor?.trim()) return;
-    const productColors = product.colors ? product.colors.split(",").map((c: string) => c.trim()) : [];
     const paramLower = paramColor.trim().toLowerCase();
-    const match = productColors.find(
-      (c: string) => c.trim().toLowerCase() === paramLower || (paramLower === "grey" && c.trim().toLowerCase() === "gray")
+    const match = product.colors?.find(
+      (c) => c.name.trim().toLowerCase() === paramLower || (paramLower === "grey" && c.name.trim().toLowerCase() === "gray")
     );
     if (match) {
-      const canonical = match.trim().toLowerCase() === "gray" ? "Grey" : match;
+      const canonical = match.name.trim().toLowerCase() === "gray" ? "Grey" : match.name;
       setSelectedColor(canonical);
       initialColorSetRef.current = true;
     }
@@ -172,8 +148,9 @@ export default function ProductDetailScreen() {
         <View style={styles.imageSection}>
           <Image
             source={
-              (selectedColor ? getTshirtImageForColor(selectedColor) : null) ??
-              getProductImageSource(product.image)
+              (selectedColorObj?.image_url || product.image_url)
+                ? { uri: selectedColorObj?.image_url || product.image_url }
+                : getProductImageSource(null)
             }
             style={styles.productImage}
             resizeMode="contain"
@@ -199,7 +176,7 @@ export default function ProductDetailScreen() {
         <View style={styles.infoSection}>
           <Text style={styles.productName}>{product.name}</Text>
           <Text style={styles.productPrice}>
-            {formatPriceMMK(product.price)}
+            {formatPriceMMK(product.sale_price ?? product.price)}
           </Text>
 
           {product.description && (
@@ -210,7 +187,7 @@ export default function ProductDetailScreen() {
             <View style={styles.optionSection}>
               <Text style={styles.optionLabel}>Size</Text>
               <View style={styles.optionRow}>
-                {sizes.map((size: string) => (
+                {sizes.map((size) => (
                   <Pressable
                     key={size}
                     style={[
@@ -240,18 +217,18 @@ export default function ProductDetailScreen() {
             <View style={styles.optionSection}>
               <Text style={styles.optionLabel}>Color</Text>
               <View style={styles.colorSwatchRow}>
-                {colors.map((color: string) => {
-                  const hex = getColorHex(color);
-                  const isSelected = selectedColor === color;
+                {colors.map((color) => {
+                  const hex = color.hex || "#9e9e9e";
+                  const isSelected = selectedColor === color.name;
                   return (
                     <Pressable
-                      key={color}
+                      key={color.id}
                       style={[
                         styles.colorSwatchOuter,
                         isSelected && styles.colorSwatchOuterActive,
                       ]}
                       onPress={() => {
-                        setSelectedColor(color);
+                        setSelectedColor(color.name);
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       }}
                     >
@@ -316,7 +293,7 @@ export default function ProductDetailScreen() {
             style={({ pressed }) => [styles.customizeBtn, pressed && { opacity: 0.9 }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push({ pathname: "/customize/[id]", params: { id: id as string, image: product.image, imageBack: product.imageBack || "" } });
+              router.push({ pathname: "/customize/[id]", params: { id: id as string, image: product.image_url, imageBack: product.image_url } });
             }}
           >
             <MaterialCommunityIcons name="tshirt-crew-outline" size={20} color={Colors.white} />
@@ -334,7 +311,9 @@ export default function ProductDetailScreen() {
         <View style={styles.bottomPrice}>
           <Text style={styles.bottomPriceLabel}>Total</Text>
           <Text style={styles.bottomPriceValue}>
-            {formatPriceMMK(parseFloat(product.price) * quantity)}
+            {formatPriceMMK(
+              (Number(product.sale_price ?? product.price) + Number(selectedColorObj?.price_delta ?? 0)) * quantity
+            )}
           </Text>
         </View>
         <Pressable

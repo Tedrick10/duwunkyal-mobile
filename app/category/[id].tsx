@@ -15,7 +15,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors, { cardShadow } from "@/constants/colors";
-import { getListingImageAndColor } from "@/lib/query-client";
+import { type ProductListItem } from "@/lib/query-client";
 import { formatPriceMMK } from "@/lib/format";
 
 const { width } = Dimensions.get("window");
@@ -26,29 +26,41 @@ export default function CategoryScreen() {
   const insets = useSafeAreaInsets();
   const webTopInset = Platform.OS === "web" ? 67 : 0;
 
-  const { data: category } = useQuery<any>({
-    queryKey: ["/api/categories"],
-    select: (cats: any[]) => cats?.find((c) => c.id === parseInt(id as string)),
+  const { data: category } = useQuery<
+    { categories: { id: number; name: string }[] },
+    Error,
+    { id: number; name: string } | undefined
+  >({
+    queryKey: ["categoryList"],
+    select: (data) => data?.categories?.find((c) => c.id === parseInt(id as string, 10)),
   });
 
-  const { data: products, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/products/category", id],
+  const { data: categoryProductListData, isLoading } = useQuery<{
+    products: ProductListItem[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  }>({
+    queryKey: ["productListByCategory", id],
+    enabled: !!id,
   });
+  const products: ProductListItem[] = categoryProductListData?.products ?? [];
 
-  function renderProduct({ item }: { item: any }) {
+  function renderProduct({ item }: { item: ProductListItem }) {
     return (
       <Pressable
         style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.9 }]}
         onPress={() =>
-          router.push({ pathname: "/product/[id]", params: { id: item.id.toString(), color: getListingImageAndColor(item).color ?? undefined } })
+          router.push({ pathname: "/product/[id]", params: { id: item.id.toString() } })
         }
       >
         <View style={styles.productImageContainer}>
-          <Image source={getListingImageAndColor(item).imageSource} style={styles.productImage} resizeMode="contain" />
+          <Image source={{ uri: item.image_url }} style={styles.productImage} resizeMode="contain" />
         </View>
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.productPrice}>{formatPriceMMK(item.price)}</Text>
+          <Text style={styles.productPrice}>{formatPriceMMK(item.sale_price ?? item.price)}</Text>
         </View>
       </Pressable>
     );
@@ -69,7 +81,7 @@ export default function CategoryScreen() {
           <ActivityIndicator size="large" color={Colors.accent} />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
-      ) : !products || products.length === 0 ? (
+      ) : products.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="shirt-outline" size={48} color={Colors.textLight} />
           <Text style={styles.emptyText}>No products in this category</Text>
@@ -78,7 +90,7 @@ export default function CategoryScreen() {
         <FlatList
           data={products}
           renderItem={renderProduct}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => String(item.id)}
           numColumns={2}
           contentContainerStyle={styles.grid}
           columnWrapperStyle={styles.gridRow}

@@ -17,6 +17,7 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, passwordConfirmation: string, name: string, phone?: string, photoUri?: string) => Promise<void>;
+  updateUser: (updates: { name?: string; email?: string; phone?: string; password?: string; password_confirmation?: string; photoUri?: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -69,14 +70,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
   }
 
+  async function updateUser(updates: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+    password_confirmation?: string;
+    photoUri?: string;
+  }) {
+    const u = await LocalDataService.updateCustomer(updates);
+    setUser(u);
+  }
+
   async function logout() {
     await AsyncStorage.removeItem(AUTH_KEY);
     await LocalDataService.setStoredUser(null);
+    await LocalDataService.setStoredToken(null);
     setUser(null);
   }
 
   const value = useMemo(
-    () => ({ user, isLoading, login, register, logout }),
+    () => ({ user, isLoading, login, register, updateUser, logout }),
     [user, isLoading]
   );
 

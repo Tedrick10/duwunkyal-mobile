@@ -99,9 +99,9 @@ export default function RegisterScreen() {
             ) : (
               <Ionicons name="camera-outline" size={32} color={Colors.accent} />
             )}
-            <View style={styles.photoBadge}>
+            {/* <View style={styles.photoBadge}>
               <Ionicons name="camera" size={14} color={Colors.white} />
-            </View>
+            </View> */}
           </Pressable>
           {photoUri ? (
             <Pressable onPress={() => setPhotoUri(null)} style={styles.removePhotoBtn}>

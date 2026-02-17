@@ -55,23 +55,6 @@ export default function ProfileScreen() {
             <Text style={styles.registerLink}>Create Account</Text>
           </Pressable>
         </View>
-
-        <View style={[styles.section, { marginTop: 32 }]}>
-          <Text style={[styles.sectionTitle, { color: C.text }]}>Appearance</Text>
-          <View style={[styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }]}>
-            <Ionicons name={isDark ? "moon" : "sunny-outline"} size={22} color={C.accent} />
-            <Text style={[styles.menuItemText, { color: C.text, flex: 1 }]}>Dark Mode</Text>
-            <Switch
-              value={isDark}
-              onValueChange={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                toggleTheme();
-              }}
-              trackColor={{ false: C.border, true: C.accent }}
-              thumbColor={Colors.white}
-            />
-          </View>
-        </View>
       </View>
     );
   }
@@ -130,6 +113,17 @@ export default function ProfileScreen() {
       </Pressable>
 
       <View style={styles.section}>
+        <Pressable
+          style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.85 }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/profile/update");
+          }}
+        >
+          <Ionicons name="pencil-outline" size={22} color={C.accent} />
+          <Text style={[styles.menuItemText, { color: C.text, flex: 1 }]}>Edit Profile</Text>
+          <Ionicons name="chevron-forward" size={18} color={C.textLight} />
+        </Pressable>
         <Pressable
           style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.85 }]}
           onPress={() => {
@@ -196,7 +190,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingTop: 80 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   avatarPlaceholder: {
     width: 80,
     height: 80,

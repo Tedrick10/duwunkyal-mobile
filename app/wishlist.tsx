@@ -6,12 +6,10 @@ import {
   Pressable,
   Image,
   FlatList,
-  Platform,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
@@ -20,21 +18,12 @@ import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-clie
 import { formatPriceMMK } from "@/lib/format";
 
 export default function WishlistScreen() {
-  const insets = useSafeAreaInsets();
-  const webTopInset = Platform.OS === "web" ? 67 : 0;
   const { user } = useAuth();
 
-  const { data: wishlist, isLoading } = useQuery<any[]>({
+  const { data: wishlist } = useQuery<any[]>({
     queryKey: ["/api/wishlist"],
     enabled: !!user,
   });
-
-  const { data: cartItems } = useQuery<any[]>({
-    queryKey: ["/api/cart"],
-    enabled: !!user,
-  });
-
-  const cartCount = cartItems?.length ?? 0;
 
   const removeWishlistMutation = useMutation({
     mutationFn: async (productId: number) => {
@@ -109,24 +98,6 @@ export default function WishlistScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.headerBar, { paddingTop: insets.top + webTopInset + 8 }]}>
-        <Pressable style={styles.headerBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={Colors.white} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Wishlist</Text>
-        <Pressable
-          style={styles.headerBtn}
-          onPress={() => router.push("/(tabs)/cart")}
-        >
-          <Ionicons name="bag-outline" size={22} color={Colors.white} />
-          {cartCount > 0 && (
-            <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>{cartCount}</Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
-
       {showEmpty ? (
         renderEmpty()
       ) : (
@@ -146,41 +117,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  headerBar: {
-    backgroundColor: Colors.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-  },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.white,
-  },
-  cartBadge: {
-    position: "absolute",
-    top: 2,
-    right: 0,
-    backgroundColor: Colors.accent,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cartBadgeText: {
-    color: Colors.white,
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
   },
   emptyContainer: {
     flex: 1,

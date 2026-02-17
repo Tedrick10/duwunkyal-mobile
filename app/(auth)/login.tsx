@@ -74,7 +74,7 @@ export default function LoginScreen() {
               <Ionicons name="mail-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="your@email.com"
+                placeholder="Enter Your Email"
                 placeholderTextColor={Colors.textLight}
                 value={email}
                 onChangeText={setEmail}
@@ -91,7 +91,7 @@ export default function LoginScreen() {
               <Ionicons name="lock-closed-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Enter password"
+                placeholder="Enter Password"
                 placeholderTextColor={Colors.textLight}
                 value={password}
                 onChangeText={setPassword}

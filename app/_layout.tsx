@@ -45,7 +45,7 @@ function RootLayoutNav() {
       />
       <Stack.Screen
         name="wishlist"
-        options={{ headerShown: false }}
+        options={{ title: "Wishlist", headerBackTitle: "Back" }}
       />
       <Stack.Screen
         name="orders"
@@ -53,7 +53,11 @@ function RootLayoutNav() {
       />
       <Stack.Screen
         name="profile/details"
-        options={{ title: "Personal Information", headerBackTitle: "Profile" }}
+        options={{ title: "Profile Details", headerBackTitle: "Profile" }}
+      />
+      <Stack.Screen
+        name="profile/update"
+        options={{ title: "Edit Profile", headerBackTitle: "Profile" }}
       />
       <Stack.Screen
         name="customize/[id]"

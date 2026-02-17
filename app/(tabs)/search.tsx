@@ -17,7 +17,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors, { cardShadow } from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
-import { getListingImageAndColor } from "@/lib/query-client";
 import { formatPriceMMK } from "@/lib/format";
 
 const { width } = Dimensions.get("window");
@@ -30,48 +29,45 @@ export default function SearchScreen() {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<number | null>(null);
 
-  const { data: products, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/products"],
+  const { data: productListData, isLoading } = useQuery<{ products: { id: number; name: string; category_id: number; image_url: string; price: number; sale_price: number | null }[] }>({
+    queryKey: ["productList"],
   });
+  const products = productListData?.products ?? [];
 
-  const { data: categories } = useQuery<any[]>({
-    queryKey: ["/api/categories"],
+  const { data: categoryData } = useQuery<{ categories: { id: number; name: string }[] }>({
+    queryKey: ["categoryList"],
   });
+  const categories = categoryData?.categories ?? [];
 
   const filtered = useMemo(() => {
-    if (!products) return [];
     let result = products;
     if (activeCategory) {
-      result = result.filter((p) => p.categoryId === activeCategory);
+      result = result.filter((p) => p.category_id === activeCategory);
     }
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          (p.description && p.description.toLowerCase().includes(q))
-      );
+      result = result.filter((p) => p.name.toLowerCase().includes(q));
     }
     return result;
   }, [products, search, activeCategory]);
 
-  function renderProduct({ item }: { item: any }) {
+  function renderProduct({ item }: { item: (typeof filtered)[0] }) {
     return (
       <Pressable
         style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.9 }, { backgroundColor: C.surface, borderColor: C.borderLight }]}
         onPress={() =>
-          router.push({ pathname: "/product/[id]", params: { id: item.id.toString(), color: getListingImageAndColor(item).color ?? undefined } })
+          router.push({ pathname: "/product/[id]", params: { id: item.id.toString() } })
         }
       >
         <View style={[styles.productImageContainer, { backgroundColor: C.productImageBg ?? Colors.productImageBg }]}>
-          <Image source={getListingImageAndColor(item).imageSource} style={styles.productImage} resizeMode="contain" />
+          <Image source={{ uri: item.image_url }} style={styles.productImage} resizeMode="contain" />
         </View>
         <View style={styles.productInfo}>
           <Text style={[styles.productName, { color: C.text }]} numberOfLines={2}>
             {item.name}
           </Text>
           <Text style={styles.productPrice}>
-            {formatPriceMMK(item.price)}
+            {formatPriceMMK(item.sale_price ?? item.price)}
           </Text>
         </View>
       </Pressable>
