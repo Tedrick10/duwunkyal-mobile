@@ -56,10 +56,6 @@ function RootLayoutNav() {
         options={{ title: "Profile Details", headerBackTitle: "Profile" }}
       />
       <Stack.Screen
-        name="profile/update"
-        options={{ title: "Edit Profile", headerBackTitle: "Profile" }}
-      />
-      <Stack.Screen
         name="customize/[id]"
         options={{ headerShown: false }}
       />

@@ -13,12 +13,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Asset from "expo-asset";
 import Colors from "@/constants/colors";
-import { getApiUrl, apiRequest, queryClient } from "@/lib/query-client";
-import {
-  TSHIRT_COLOR_PRICES,
-  CLIPART_PRICES,
-  TEMPLATE_PRICES,
-} from "@/components/customize/types";
+import { getApiUrl, apiRequest, queryClient, type ClipartItem, type TemplateItem } from "@/lib/query-client";
+import { TSHIRT_COLOR_PRICES } from "@/components/customize/types";
 import { DesignEditor, type DesignEditorRef } from "@/components/customize/DesignEditor";
 import { TSHIRT_FRONT_SVG } from "@/lib/tshirt-front-svg";
 import { TSHIRT_BACK_SVG } from "@/lib/tshirt-back-svg";
@@ -102,6 +98,23 @@ export default function CustomizeScreen() {
   });
   const basePrice = product?.price != null ? parseFloat(product.price) : 0;
 
+  const { data: clipartListData } = useQuery<{ cliparts: ClipartItem[] }>({
+    queryKey: ["clipartList"],
+  });
+  const { data: templateListData } = useQuery<{ templates: TemplateItem[] }>({
+    queryKey: ["templateList"],
+  });
+  const cliparts: ClipartItem[] = clipartListData?.cliparts ?? [];
+  const templates: TemplateItem[] = templateListData?.templates ?? [];
+  const clipartPriceBySourceId = React.useMemo(
+    () => Object.fromEntries(cliparts.map((c) => [`clipart-${c.id}`, c.price])),
+    [cliparts]
+  );
+  const templatePriceBySourceId = React.useMemo(
+    () => Object.fromEntries(templates.map((t) => [`template-${t.id}`, t.price])),
+    [templates]
+  );
+
   const baseUrl = getApiUrl();
   const customizeUrlBase =
     baseUrl &&
@@ -125,8 +138,8 @@ export default function CustomizeScreen() {
     (TSHIRT_COLOR_PRICES[tshirtCollarColor] ?? 0);
   const clipartTemplatePrice = [...frontDesign, ...backDesign].reduce((sum, el) => {
     if (el.type !== "image" || !("sourceId" in el) || !el.sourceId) return sum;
-    const clip = CLIPART_PRICES[el.sourceId];
-    const tpl = TEMPLATE_PRICES[el.sourceId];
+    const clip = clipartPriceBySourceId[el.sourceId];
+    const tpl = templatePriceBySourceId[el.sourceId];
     return sum + (clip ?? 0) + (tpl ?? 0);
   }, 0);
   const totalPrice = basePrice + colorPrice + clipartTemplatePrice;
@@ -179,29 +192,8 @@ export default function CustomizeScreen() {
     [setCurrentDesign, pushUndo]
   );
 
-  const CLIPART_MODULES = useRef<number[]>([
-    require("@/assets/cliparts/clipart-1.png"),
-    require("@/assets/cliparts/clipart-2.png"),
-    require("@/assets/cliparts/clipart-3.png"),
-    require("@/assets/cliparts/clipart-4.png"),
-  ]).current;
-
-  const TEMPLATE_MODULES = useRef<number[]>([
-    require("@/assets/templates/template-1.png"),
-    require("@/assets/templates/template-2.png"),
-    require("@/assets/templates/template-3.png"),
-    require("@/assets/templates/template-4.png"),
-  ]).current;
-
-  const addPresetImage = useCallback(
-    async (moduleId: number, sourceId?: string) => {
-      const asset = Asset.Asset.fromModule(moduleId);
-      try {
-        await asset.downloadAsync();
-      } catch {
-        // Ignore; uri may still be available in dev
-      }
-      const uri = asset.localUri ?? asset.uri;
+  const addPresetImageFromUrl = useCallback(
+    (uri: string, sourceId: string) => {
       if (!uri) return;
       const el: ImageElement = {
         id: generateId(),
@@ -211,7 +203,7 @@ export default function CustomizeScreen() {
         width: 120,
         height: 120,
         uri,
-        ...(sourceId ? { sourceId } : {}),
+        sourceId,
       };
       addElement(el);
     },
@@ -600,36 +592,30 @@ export default function CustomizeScreen() {
         visible={clipartsOpen}
         title="Cliparts"
         onClose={handleClipartsClose}
-        items={CLIPART_MODULES.map((src, idx) => {
-          const sourceId = `clipart-${idx + 1}`;
-          return {
-            id: sourceId,
-            source: src,
-            price: CLIPART_PRICES[sourceId],
-            onPress: async () => {
-              handleClipartsClose();
-              await addPresetImage(src, sourceId);
-            },
-          };
-        })}
+        items={cliparts.map((c) => ({
+          id: String(c.id),
+          source: { uri: c.thumbnail_url },
+          price: c.price,
+          onPress: () => {
+            handleClipartsClose();
+            addPresetImageFromUrl(c.file_url || c.thumbnail_url, `clipart-${c.id}`);
+          },
+        }))}
       />
 
       <ImageLibraryModal
         visible={templateOpen}
         title="Template"
         onClose={handleTemplateClose}
-        items={TEMPLATE_MODULES.map((src, idx) => {
-          const sourceId = `template-${idx + 1}`;
-          return {
-            id: sourceId,
-            source: src,
-            price: TEMPLATE_PRICES[sourceId],
-            onPress: async () => {
-              handleTemplateClose();
-              await addPresetImage(src, sourceId);
-            },
-          };
-        })}
+        items={templates.map((t) => ({
+          id: String(t.id),
+          source: { uri: t.thumbnail_url },
+          price: t.price,
+          onPress: () => {
+            handleTemplateClose();
+            addPresetImageFromUrl(t.file_url || t.thumbnail_url, `template-${t.id}`);
+          },
+        }))}
       />
     </View>
   );

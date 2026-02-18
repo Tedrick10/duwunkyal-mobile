@@ -45,6 +45,23 @@ export type ProductDetail = {
   model_3d_id: number | null;
 };
 
+export type ClipartItem = {
+  id: number;
+  name: string;
+  thumbnail_url: string;
+  file_path: string | null;
+  file_url: string | null;
+  price: number;
+};
+export type TemplateItem = {
+  id: number;
+  name: string;
+  thumbnail_url: string;
+  file_path: string | null;
+  file_url: string | null;
+  price: number;
+};
+
 const DEFAULT_PRODUCT_IMAGE = require("../assets/products/tshirt-default.png");
 
 /** Color t-shirt images for product listings (random-looking but stable per product id). */
@@ -252,6 +269,38 @@ export const getQueryFn: <T>(options: {
           per_page: json.per_page ?? 15,
           total: json.total ?? 0,
         } as { products: ProductListItem[]; current_page: number; last_page: number; per_page: number; total: number };
+      }
+
+      if (route === "clipartList") {
+        const res = await fetch(apiMobileUrl("clipartList"), {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error("Clipart list failed");
+        const json = await res.json();
+        return {
+          cliparts: json.cliparts ?? [],
+          current_page: json.current_page ?? 1,
+          last_page: json.last_page ?? 1,
+          per_page: json.per_page ?? 15,
+          total: json.total ?? 0,
+        } as { cliparts: ClipartItem[]; current_page: number; last_page: number; per_page: number; total: number };
+      }
+
+      if (route === "templateList") {
+        const res = await fetch(apiMobileUrl("templateList"), {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error("Template list failed");
+        const json = await res.json();
+        return {
+          templates: json.templates ?? [],
+          current_page: json.current_page ?? 1,
+          last_page: json.last_page ?? 1,
+          per_page: json.per_page ?? 15,
+          total: json.total ?? 0,
+        } as { templates: TemplateItem[]; current_page: number; last_page: number; per_page: number; total: number };
       }
 
       if (route.startsWith("productListByCategory/")) {

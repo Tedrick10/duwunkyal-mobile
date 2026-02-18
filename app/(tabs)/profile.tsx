@@ -117,17 +117,6 @@ export default function ProfileScreen() {
           style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.85 }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/profile/update");
-          }}
-        >
-          <Ionicons name="pencil-outline" size={22} color={C.accent} />
-          <Text style={[styles.menuItemText, { color: C.text, flex: 1 }]}>Edit Profile</Text>
-          <Ionicons name="chevron-forward" size={18} color={C.textLight} />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.85 }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/orders");
           }}
         >
