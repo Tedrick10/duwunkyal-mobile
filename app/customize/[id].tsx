@@ -6,18 +6,15 @@ import {
   TouchableOpacity,
   Text,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import * as Asset from "expo-asset";
 import Colors from "@/constants/colors";
-import { getApiUrl, apiRequest, queryClient, type ClipartItem, type TemplateItem } from "@/lib/query-client";
-import { TSHIRT_COLOR_PRICES } from "@/components/customize/types";
+import { getApiUrl, apiRequest, queryClient, type ClipartItem, type TemplateItem, type ProductCustomization, type ProductDetail } from "@/lib/query-client";
 import { DesignEditor, type DesignEditorRef } from "@/components/customize/DesignEditor";
-import { TSHIRT_FRONT_SVG } from "@/lib/tshirt-front-svg";
-import { TSHIRT_BACK_SVG } from "@/lib/tshirt-back-svg";
 import { Preview3D } from "@/components/customize/Preview3D";
 import { ImageLibraryModal } from "@/components/customize/ImageLibraryModal";
 import type {
@@ -25,6 +22,7 @@ import type {
   DesignView,
   TextElement,
   ImageElement,
+  TshirtColorPart,
 } from "@/components/customize/types";
 import * as ImagePicker from "expo-image-picker";
 import { CONTAINER_W, CONTAINER_H } from "@/components/customize/types";
@@ -67,6 +65,7 @@ export default function CustomizeScreen() {
   const [addedToCart, setAddedToCart] = useState(false);
   const designEditorRef = useRef<DesignEditorRef>(null);
   const currentElementsRef = useRef<DesignElement[]>([]);
+  const customizationColorsAppliedRef = useRef(false);
   currentElementsRef.current = view === "front" ? frontDesign : backDesign;
 
   const addToCartMutation = useMutation({
@@ -93,16 +92,23 @@ export default function CustomizeScreen() {
     onError: () => Alert.alert("Error", "Could not add to cart."),
   });
 
-  const { data: product } = useQuery<{ price?: string }>({
-    queryKey: ["/api/products", id],
+  const { data: productDetail } = useQuery<ProductDetail | null>({
+    queryKey: ["productDetail", id],
+    enabled: !!id,
   });
-  const basePrice = product?.price != null ? parseFloat(product.price) : 0;
+  const basePrice = productDetail != null
+    ? Number(productDetail.sale_price ?? productDetail.price ?? 0)
+    : 0;
 
   const { data: clipartListData } = useQuery<{ cliparts: ClipartItem[] }>({
     queryKey: ["clipartList"],
   });
   const { data: templateListData } = useQuery<{ templates: TemplateItem[] }>({
     queryKey: ["templateList"],
+  });
+  const { data: customization, isLoading: customizationLoading } = useQuery<ProductCustomization>({
+    queryKey: ["productCustomization", id],
+    enabled: !!id,
   });
   const cliparts: ClipartItem[] = clipartListData?.cliparts ?? [];
   const templates: TemplateItem[] = templateListData?.templates ?? [];
@@ -115,6 +121,41 @@ export default function CustomizeScreen() {
     [templates]
   );
 
+  /** Template regions from API (Body / Sleeves / Collar) – only show regions present in template_regions. */
+  const templateRegions = React.useMemo((): { id: TshirtColorPart; label: string }[] => {
+    const front = customization?.template_regions?.front_regions;
+    if (!front || typeof front !== "object") {
+      return [{ id: "body", label: "Body" }, { id: "sleeves", label: "Sleeves" }, { id: "collar", label: "Collar" }];
+    }
+    const keys = Object.keys(front);
+    const partOrder: TshirtColorPart[] = ["body", "sleeves", "collar"];
+    const labelByPart: Record<TshirtColorPart, string> = { body: "Body", sleeves: "Sleeves", collar: "Collar" };
+    const hasPart = (part: TshirtColorPart): boolean => {
+      const k = part === "sleeves" ? "sleeve" : part;
+      return keys.some((key) => key.toLowerCase().includes(k));
+    };
+    return partOrder.filter(hasPart).map((id) => ({ id, label: labelByPart[id] }));
+  }, [customization?.template_regions?.front_regions]);
+
+  useEffect(() => {
+    const ids = templateRegions.map((r) => r.id);
+    if (ids.length && !ids.includes(colorPart)) setColorPart(ids[0]);
+  }, [templateRegions, colorPart]);
+
+  useEffect(() => {
+    if (!customization?.colors?.length || customizationColorsAppliedRef.current) return;
+    const firstHex = customization.colors[0].hex;
+    if (firstHex) {
+      setTshirtBodyColor(firstHex);
+      setTshirtSleeveColor(firstHex);
+      setTshirtCollarColor(firstHex);
+      customizationColorsAppliedRef.current = true;
+    }
+  }, [customization?.colors]);
+  useEffect(() => {
+    customizationColorsAppliedRef.current = false;
+  }, [id]);
+
   const baseUrl = getApiUrl();
   const customizeUrlBase =
     baseUrl &&
@@ -123,19 +164,22 @@ export default function CustomizeScreen() {
       ? `${baseUrl.replace(/\/$/, "")}/customize/${id}`
       : "";
 
-  const imageParam = image ? `&image=${encodeURIComponent(image as string)}` : "";
-  const imageBackParam = imageBack ? `&imageBack=${encodeURIComponent(imageBack as string)}` : "";
+  const frontImageUrl = customization?.front_view?.image_url ?? (image as string);
+  const backImageUrl = customization?.back_view?.image_url ?? (imageBack as string);
+  const imageParam = frontImageUrl ? `&image=${encodeURIComponent(frontImageUrl)}` : "";
+  const imageBackParam = backImageUrl ? `&imageBack=${encodeURIComponent(backImageUrl)}` : "";
   const customizeUrl =
     Platform.OS === "web"
-      ? `${customizeUrlBase}?${image ? `image=${encodeURIComponent(image as string)}` : ""}${imageBack ? `&imageBack=${encodeURIComponent(imageBack as string)}` : ""}`
+      ? `${customizeUrlBase}?${frontImageUrl ? `image=${encodeURIComponent(frontImageUrl)}` : ""}${backImageUrl ? `&imageBack=${encodeURIComponent(backImageUrl)}` : ""}`
       : `${customizeUrlBase}?webview=1${imageParam}${imageBackParam}`;
 
   const currentElements = view === "front" ? frontDesign : backDesign;
 
-  const colorPrice =
-    (TSHIRT_COLOR_PRICES[tshirtBodyColor] ?? 0) +
-    (TSHIRT_COLOR_PRICES[tshirtSleeveColor] ?? 0) +
-    (TSHIRT_COLOR_PRICES[tshirtCollarColor] ?? 0);
+  const colorPrice = customization?.colors
+    ? (customization.colors.find((c) => c.hex === tshirtBodyColor)?.price_delta ?? 0) +
+    (customization.colors.find((c) => c.hex === tshirtSleeveColor)?.price_delta ?? 0) +
+    (customization.colors.find((c) => c.hex === tshirtCollarColor)?.price_delta ?? 0)
+    : 0;
   const clipartTemplatePrice = [...frontDesign, ...backDesign].reduce((sum, el) => {
     if (el.type !== "image" || !("sourceId" in el) || !el.sourceId) return sum;
     const clip = clipartPriceBySourceId[el.sourceId];
@@ -358,6 +402,23 @@ export default function CustomizeScreen() {
     Alert.alert("Save", "Design saved. (Export image can be added later.)");
   }, []);
 
+  const handleColorChange = useCallback((color: string) => {
+    startTransition(() => {
+      if (colorPart === "body") setTshirtBodyColor(color);
+      else if (colorPart === "sleeves") setTshirtSleeveColor(color);
+      else setTshirtCollarColor(color);
+    });
+  }, [colorPart]);
+
+  const handleViewChange = useCallback((v: DesignView) => {
+    startTransition(() => setView(v));
+  }, []);
+
+  const handleClipartsOpen = useCallback(() => setClipartsOpen(true), []);
+  const handleTemplateOpen = useCallback(() => setTemplateOpen(true), []);
+  const handleClipartsClose = useCallback(() => setClipartsOpen(false), []);
+  const handleTemplateClose = useCallback(() => setTemplateOpen(false), []);
+
   useEffect(() => {
     if (Platform.OS === "web") {
       const handleMessage = (event: MessageEvent) => {
@@ -369,25 +430,13 @@ export default function CustomizeScreen() {
   }, []);
 
   const [objReady, setObjReady] = useState(false);
+  // 3D model: use only backend OBJ from productCustomization view_3d.obj_url (no local/fallback OBJ).
   useEffect(() => {
     if (Platform.OS === "web") return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const asset = Asset.Asset.fromModule(
-          require("../../assets/models/man_tshirt.obj")
-        );
-        await asset.downloadAsync();
-        if (!cancelled)
-          setObjUri(asset.localUri ?? asset.uri ?? null);
-      } catch {
-        if (!cancelled) setObjUri(null);
-      } finally {
-        if (!cancelled) setObjReady(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    const objUrl = customization?.view_3d?.obj_url ?? null;
+    setObjUri(objUrl);
+    setObjReady(true);
+  }, [customization?.view_3d?.obj_url]);
 
   if (Platform.OS === "web") {
     return (
@@ -421,25 +470,32 @@ export default function CustomizeScreen() {
     );
   }
 
-  const frontImage = require("@/assets/products/tshirt-front.png");
-  const backImage = require("@/assets/products/tshirt-back.png");
+  if (id && customizationLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <View style={[styles.nativeHeader, { paddingTop: insets.top }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={22} color="#fff" />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 12 }}>
+          <ActivityIndicator size="large" color={Colors.accent} />
+          <Text style={{ fontSize: 14, color: Colors.textSecondary }}>Loading customization…</Text>
+        </View>
+      </View>
+    );
+  }
 
-  const handleColorChange = useCallback((color: string) => {
-    startTransition(() => {
-      if (colorPart === "body") setTshirtBodyColor(color);
-      else if (colorPart === "sleeves") setTshirtSleeveColor(color);
-      else setTshirtCollarColor(color);
-    });
-  }, [colorPart]);
-
-  const handleViewChange = useCallback((v: DesignView) => {
-    startTransition(() => setView(v));
-  }, []);
-
-  const handleClipartsOpen = useCallback(() => setClipartsOpen(true), []);
-  const handleTemplateOpen = useCallback(() => setTemplateOpen(true), []);
-  const handleClipartsClose = useCallback(() => setClipartsOpen(false), []);
-  const handleTemplateClose = useCallback(() => setTemplateOpen(false), []);
+  const TRANSPARENT_PIXEL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  const frontImage =
+    customization?.front_view?.image_url
+      ? { uri: customization.front_view.image_url }
+      : (image ? { uri: image as string } : { uri: TRANSPARENT_PIXEL });
+  const backImage =
+    customization?.back_view?.image_url
+      ? { uri: customization.back_view.image_url }
+      : (imageBack ? { uri: imageBack as string } : { uri: TRANSPARENT_PIXEL });
 
   return (
     <View style={styles.container}>
@@ -482,8 +538,6 @@ export default function CustomizeScreen() {
           textModalVisible={textModalVisible}
           frontImage={frontImage}
           backImage={backImage}
-          frontSvg={TSHIRT_FRONT_SVG}
-          backSvg={TSHIRT_BACK_SVG}
           onViewChange={handleViewChange}
           onColorChange={handleColorChange}
           onAddText={handleAddText}
@@ -497,6 +551,8 @@ export default function CustomizeScreen() {
           onMoveElement={handleMoveElement}
           onUpdateElement={handleUpdateElement}
           onDragStart={pushUndo}
+          availableColors={customization?.colors?.map((c) => ({ hex: c.hex, name: c.name }))}
+          templateRegions={templateRegions}
         />
         <TouchableOpacity
           style={styles.preview3DWidget}

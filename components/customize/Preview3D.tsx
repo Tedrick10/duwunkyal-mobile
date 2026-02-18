@@ -10,7 +10,7 @@ import {
 import { GLView, ExpoWebGLRenderingContext } from "expo-gl";
 import { Renderer, loadTextureAsync } from "expo-three";
 import { Asset } from "expo-asset";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system";
 import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 
@@ -402,9 +402,17 @@ export function Preview3D({
           addObjToScene(clone, scene, material);
         } else {
           const loader = new OBJLoader();
-          const objText = await FileSystem.readAsStringAsync(objUri, {
-            encoding: "utf8",
-          });
+          let objText: string;
+          const isRemote = objUri.startsWith("http://") || objUri.startsWith("https://");
+          if (isRemote) {
+            const res = await fetch(objUri);
+            if (!res.ok) throw new Error("OBJ fetch failed");
+            objText = await res.text();
+          } else {
+            objText = await FileSystem.readAsStringAsync(objUri, {
+              encoding: "utf8",
+            });
+          }
           const obj = loader.parse(objText);
           rootObj = obj;
           obj.traverse((child: THREE.Object3D) => {

@@ -26,6 +26,25 @@ export type ProductDetailColor = {
   price_delta: number;
   image_url: string | null;
 };
+/** Region for customize (front/back body, sleeves). */
+export type ProductDetailCustomizeRegion = {
+  x: number;
+  y: number;
+  type: string;
+  width: number;
+  height: number;
+};
+
+export type ProductDetailCustomize = {
+  front_image_url: string;
+  back_image_url: string;
+  regions: {
+    front_regions: Record<string, ProductDetailCustomizeRegion>;
+    back_regions: Record<string, ProductDetailCustomizeRegion>;
+  };
+  available_colors: Array<{ id: number; name: string; hex: string }>;
+};
+
 export type ProductDetail = {
   id: number;
   name: string;
@@ -43,6 +62,55 @@ export type ProductDetail = {
   sizes: ProductDetailSize[];
   colors: ProductDetailColor[];
   model_3d_id: number | null;
+  customize_enabled?: boolean;
+  customize?: ProductDetailCustomize | null;
+};
+
+/** Region for product customization (body, sleeve_left, sleeve_right). */
+export type ProductCustomizationRegion = {
+  x: number;
+  y: number;
+  type: string;
+  width: number;
+  height: number;
+};
+
+export type ProductCustomizationView = {
+  image_url: string;
+  regions: Record<string, ProductCustomizationRegion>;
+};
+
+export type ProductCustomizationView3D = {
+  id: number;
+  name: string;
+  obj_url: string;
+  mtl_url: string | null;
+  texture_urls: string[];
+  thumbnail_url: string | null;
+  scale_position: unknown | null;
+};
+
+export type ProductCustomizationColor = {
+  id: number;
+  color_id: number;
+  name: string;
+  hex: string;
+  image_url: string | null;
+  price_delta: number;
+};
+
+export type ProductCustomization = {
+  product_id: number;
+  product_name: string;
+  customize_enabled: boolean;
+  front_view: ProductCustomizationView;
+  back_view: ProductCustomizationView;
+  view_3d: ProductCustomizationView3D | null;
+  colors: ProductCustomizationColor[];
+  template_regions: {
+    front_regions: Record<string, ProductCustomizationRegion>;
+    back_regions: Record<string, ProductCustomizationRegion>;
+  };
 };
 
 export type ClipartItem = {
@@ -62,82 +130,38 @@ export type TemplateItem = {
   price: number;
 };
 
-const DEFAULT_PRODUCT_IMAGE = require("../assets/products/tshirt-default.png");
-
-/** Color t-shirt images for product listings (random-looking but stable per product id). */
-const PRODUCT_LISTING_IMAGES: ImageSourcePropType[] = [
-  require("../assets/products/tshirt-color-white.png"),
-  require("../assets/products/tshirt-color-black.png"),
-  require("../assets/products/tshirt-color-green.png"),
-  require("../assets/products/tshirt-color-blue.png"),
-  require("../assets/products/tshirt-color-red.png"),
-  require("../assets/products/tshirt-color-navy.png"),
-  require("../assets/products/tshirt-color-yellow.png"),
-  require("../assets/products/tshirt-color-pink.png"),
-  require("../assets/products/tshirt-color-orange.png"),
-  require("../assets/products/tshirt-color-grey.png"),
-  require("../assets/products/tshirt-color-brown.png"),
-];
-
-/** Color names in same order as PRODUCT_LISTING_IMAGES (for default selection on product details). */
-const LISTING_COLOR_NAMES = [
-  "White", "Black", "Green", "Blue", "Red", "Navy", "Yellow", "Pink", "Orange", "Grey", "Brown",
-];
-
-/** Returns a stable "random" product image for listings based on product id. */
-export function getListingProductImageSource(productId: number): ImageSourcePropType {
-  const id = typeof productId === "number" ? productId : parseInt(String(productId), 10) || 0;
-  const index = Math.abs(id) % PRODUCT_LISTING_IMAGES.length;
-  return PRODUCT_LISTING_IMAGES[index];
-}
-
-/** Returns the color name shown for this product on the listing (for default on product details). */
-export function getListingColorForProductId(productId: number): string | null {
-  const id = typeof productId === "number" ? productId : parseInt(String(productId), 10) || 0;
-  const index = Math.abs(id) % LISTING_COLOR_NAMES.length;
-  return LISTING_COLOR_NAMES[index];
-}
-
-/** T-shirt images by color (for listing and details). Gray maps to Grey. */
-const TSHIRT_COLOR_IMAGES: Record<string, ImageSourcePropType> = {
-  White: require("../assets/products/tshirt-color-white.png"),
-  Black: require("../assets/products/tshirt-color-black.png"),
-  Green: require("../assets/products/tshirt-color-green.png"),
-  Blue: require("../assets/products/tshirt-color-blue.png"),
-  Red: require("../assets/products/tshirt-color-red.png"),
-  Navy: require("../assets/products/tshirt-color-navy.png"),
-  Yellow: require("../assets/products/tshirt-color-yellow.png"),
-  Pink: require("../assets/products/tshirt-color-pink.png"),
-  Orange: require("../assets/products/tshirt-color-orange.png"),
-  Grey: require("../assets/products/tshirt-color-grey.png"),
-  Brown: require("../assets/products/tshirt-color-brown.png"),
+/** No demo asset: use neutral placeholder when API provides no product image. */
+const PLACEHOLDER_PRODUCT_IMAGE: ImageSourcePropType = {
+  uri: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
 };
 
-/** Returns t-shirt image for a color name (case-insensitive; Gray → Grey). */
-export function getTshirtImageForColor(colorName: string): ImageSourcePropType | null {
-  const key = (colorName || "").trim();
-  const lower = key.toLowerCase();
-  if (lower === "gray") return TSHIRT_COLOR_IMAGES.Grey;
-  const found = Object.keys(TSHIRT_COLOR_IMAGES).find((k) => k.toLowerCase() === lower);
-  return found ? TSHIRT_COLOR_IMAGES[found] : null;
+/** No demo listing image: use API image or placeholder. */
+export function getListingProductImageSource(_productId: number): ImageSourcePropType {
+  return PLACEHOLDER_PRODUCT_IMAGE;
 }
 
-/** Listing image and color from product’s actual colors so list and details match. */
+/** No demo color: return null; product detail uses API colors. */
+export function getListingColorForProductId(_productId: number): string | null {
+  return null;
+}
+
+/** No demo t-shirt-by-color image: return null; use API product/color image_url. */
+export function getTshirtImageForColor(_colorName: string): ImageSourcePropType | null {
+  return null;
+}
+
+/** Listing image from API (image_url) or placeholder; color from product’s .colors first if present. */
 export function getListingImageAndColor(product: {
   id: number;
+  image_url?: string | null;
   colors?: string | null;
 }): { imageSource: ImageSourcePropType; color: string | null } {
+  const imageSource = getProductImageSource(product.image_url ?? null);
   const colors = product.colors
     ? product.colors.split(",").map((c: string) => c.trim()).filter(Boolean)
     : [];
-  if (colors.length === 0) {
-    return { imageSource: getListingProductImageSource(product.id), color: null };
-  }
-  const id = typeof product.id === "number" ? product.id : parseInt(String(product.id), 10) || 0;
-  const index = Math.abs(id) % colors.length;
-  const chosenColor = colors[index];
-  const imageSource = getTshirtImageForColor(chosenColor) ?? getListingProductImageSource(product.id);
-  return { imageSource, color: chosenColor };
+  const color = colors.length > 0 ? colors[0] : null;
+  return { imageSource, color };
 }
 
 export function getApiUrl(): string {
@@ -145,8 +169,8 @@ export function getApiUrl(): string {
 }
 
 export function getProductImageSource(path: string | null | undefined): ImageSourcePropType {
-  if (!path) return DEFAULT_PRODUCT_IMAGE;
-  if (path.includes("tshirt-default.png")) return DEFAULT_PRODUCT_IMAGE;
+  if (!path) return PLACEHOLDER_PRODUCT_IMAGE;
+  if (path.includes("tshirt-default.png")) return PLACEHOLDER_PRODUCT_IMAGE;
   return { uri: getImageUrl(path) };
 }
 
@@ -237,6 +261,17 @@ export const getQueryFn: <T>(options: {
         if (!res.ok) throw new Error("Product detail failed");
         const json = await res.json();
         return (json.product ?? null) as ProductDetail | null;
+      }
+
+      if (route.startsWith("productCustomization/")) {
+        const productId = route.replace("productCustomization/", "");
+        const res = await fetch(apiMobileUrl(`productCustomization/${productId}`), {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error("Product customization failed");
+        const json = await res.json();
+        return json as ProductCustomization;
       }
 
       if (route === "productList") {
@@ -385,7 +420,7 @@ const CATEGORY_IMAGES: Record<string, ImageSourcePropType> = {
 };
 
 export function getCategoryImageSource(path: string | null | undefined): ImageSourcePropType {
-  if (!path) return DEFAULT_PRODUCT_IMAGE;
+  if (!path) return PLACEHOLDER_PRODUCT_IMAGE;
   const local = CATEGORY_IMAGES[path];
   if (local) return local;
   return { uri: getImageUrl(path) };

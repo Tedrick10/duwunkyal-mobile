@@ -147,11 +147,7 @@ export default function ProductDetailScreen() {
       >
         <View style={styles.imageSection}>
           <Image
-            source={
-              (selectedColorObj?.image_url || product.image_url)
-                ? { uri: selectedColorObj?.image_url || product.image_url }
-                : getProductImageSource(null)
-            }
+            source={getProductImageSource(selectedColorObj?.image_url ?? product.image_url ?? null)}
             style={styles.productImage}
             resizeMode="contain"
           />
@@ -289,16 +285,20 @@ export default function ProductDetailScreen() {
             </Text>
           </View>
 
-          <Pressable
-            style={({ pressed }) => [styles.customizeBtn, pressed && { opacity: 0.9 }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push({ pathname: "/customize/[id]", params: { id: id as string, image: product.image_url, imageBack: product.image_url } });
-            }}
-          >
-            <MaterialCommunityIcons name="tshirt-crew-outline" size={20} color={Colors.white} />
-            <Text style={styles.customizeBtnText}>Customize Design</Text>
-          </Pressable>
+          {(product.customize_enabled ?? !!product.customize) && (
+            <Pressable
+              style={({ pressed }) => [styles.customizeBtn, pressed && { opacity: 0.9 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                const image = product.customize?.front_image_url ?? product.image_url;
+                const imageBack = product.customize?.back_image_url ?? product.image_url;
+                router.push({ pathname: "/customize/[id]", params: { id: id as string, image, imageBack } });
+              }}
+            >
+              <MaterialCommunityIcons name="tshirt-crew-outline" size={20} color={Colors.white} />
+              <Text style={styles.customizeBtnText}>Customize Design</Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
 

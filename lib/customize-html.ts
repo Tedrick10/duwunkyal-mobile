@@ -3,7 +3,7 @@
  * Uses base64 data URIs so WebView can load images regardless of origin.
  */
 import { Asset } from "expo-asset";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system";
 
 const IMAGE_FRONT_PLACEHOLDER = "__IMAGE_FRONT__";
 const IMAGE_BACK_PLACEHOLDER = "__IMAGE_BACK__";

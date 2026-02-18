@@ -57,6 +57,10 @@ type Props = {
   onDragStart?: () => void;
   /** When true, hide toolbar/color bar/view switcher and make canvas non-interactive (e.g. for cart design viewer). */
   readOnly?: boolean;
+  /** When provided (e.g. from productCustomization API), passed to ColorBar for region colors. */
+  availableColors?: Array<{ hex: string; name?: string }>;
+  /** When provided (e.g. from productCustomization API), region buttons (Body/Sleeves/Collar) are bound to these. */
+  templateRegions?: Array<{ id: TshirtColorPart; label: string }>;
 };
 
 export type DesignEditorRef = { capture: () => Promise<string | undefined> };
@@ -506,11 +510,23 @@ const DesignEditorInner = memo(function DesignEditorInner({
   onUpdateElement,
   onDragStart,
   readOnly = false,
+  availableColors,
+  templateRegions,
   viewShotRef,
   captureShotRef,
 }: Props & { viewShotRef: React.RefObject<ViewShot | null>; captureShotRef: React.RefObject<ViewShot | null> }) {
-  const silhouetteSource = view === "front" ? frontImage : backImage;
-  const svgSource = view === "front" ? frontSvg : backSvg;
+  const regionButtons = templateRegions?.length
+    ? templateRegions
+    : ([{ id: "body" as const, label: "Body" }, { id: "sleeves" as const, label: "Sleeves" }, { id: "collar" as const, label: "Collar" }]);
+
+  // Defer expensive SVG tint so Front/Back and color taps feel instant
+  const deferredView = useDeferredValue(view);
+  const deferredBodyColor = useDeferredValue(bodyColor);
+  const deferredSleeveColor = useDeferredValue(sleeveColor);
+  const deferredCollarColor = useDeferredValue(collarColor);
+
+  const deferredSilhouetteSource = deferredView === "front" ? frontImage : backImage;
+  const deferredSvgSource = deferredView === "front" ? frontSvg : backSvg;
   const selectedColor = colorPart === "body" ? bodyColor : colorPart === "sleeves" ? sleeveColor : collarColor;
   const ch = CONTAINER_H * TSHIRT_REGIONS.collarHeight;
   const sw = CONTAINER_W * TSHIRT_REGIONS.sleeveWidth;
@@ -518,20 +534,20 @@ const DesignEditorInner = memo(function DesignEditorInner({
   const bodyH = CONTAINER_H - ch;
 
   const svgFitted = useMemo(
-    () => (svgSource ? ensureSvgFits(svgSource) : null),
-    [svgSource]
+    () => (deferredSvgSource ? ensureSvgFits(deferredSvgSource) : null),
+    [deferredSvgSource]
   );
   const tintedCollarSvg = useMemo(
-    () => (svgFitted ? tintSvgFills(svgFitted, collarColor) : null),
-    [svgFitted, collarColor]
+    () => (svgFitted ? tintSvgFills(svgFitted, deferredCollarColor) : null),
+    [svgFitted, deferredCollarColor]
   );
   const tintedBodySvg = useMemo(
-    () => (svgFitted ? tintSvgFills(svgFitted, bodyColor) : null),
-    [svgFitted, bodyColor]
+    () => (svgFitted ? tintSvgFills(svgFitted, deferredBodyColor) : null),
+    [svgFitted, deferredBodyColor]
   );
   const tintedSleeveSvg = useMemo(
-    () => (svgFitted ? tintSvgFills(svgFitted, sleeveColor) : null),
-    [svgFitted, sleeveColor]
+    () => (svgFitted ? tintSvgFills(svgFitted, deferredSleeveColor) : null),
+    [svgFitted, deferredSleeveColor]
   );
 
   const renderRegion = (color: string, key: string, region: "collar" | "body" | "sleeve") => {
@@ -548,10 +564,11 @@ const DesignEditorInner = memo(function DesignEditorInner({
         />
       );
     }
+    const src = deferredSilhouetteSource;
     return Platform.OS === "web" ? (
       <Image
         key={key}
-        source={silhouetteSource}
+        source={src}
         style={[StyleSheet.absoluteFill, styles.tshirtBg]}
         resizeMode="contain"
         tintColor={color}
@@ -561,7 +578,7 @@ const DesignEditorInner = memo(function DesignEditorInner({
         key={key}
         style={[StyleSheet.absoluteFill, styles.tshirtBg]}
         maskElement={
-          <Image source={silhouetteSource} style={[StyleSheet.absoluteFill, styles.tshirtBg]} resizeMode="contain" />
+          <Image source={src} style={[StyleSheet.absoluteFill, styles.tshirtBg]} resizeMode="contain" />
         }
       >
         <View style={[StyleSheet.absoluteFill, styles.tshirtBg, { backgroundColor: color, opacity: 1 }]} />
@@ -645,29 +662,18 @@ const DesignEditorInner = memo(function DesignEditorInner({
         {!readOnly && (
           <>
             <View style={styles.colorPartRow}>
-              <TouchableOpacity
-                style={[styles.colorPartBtn, colorPart === "body" && styles.colorPartBtnActive]}
-                onPress={() => onColorPartChange("body")}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.colorPartText, colorPart === "body" && styles.colorPartTextActive]}>Body</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.colorPartBtn, colorPart === "sleeves" && styles.colorPartBtnActive]}
-                onPress={() => onColorPartChange("sleeves")}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.colorPartText, colorPart === "sleeves" && styles.colorPartTextActive]}>Sleeves</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.colorPartBtn, colorPart === "collar" && styles.colorPartBtnActive]}
-                onPress={() => onColorPartChange("collar")}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.colorPartText, colorPart === "collar" && styles.colorPartTextActive]}>Collar</Text>
-              </TouchableOpacity>
+              {regionButtons.map(({ id, label }) => (
+                <TouchableOpacity
+                  key={id}
+                  style={[styles.colorPartBtn, colorPart === id && styles.colorPartBtnActive]}
+                  onPress={() => onColorPartChange(id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.colorPartText, colorPart === id && styles.colorPartTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-            <ColorBar selectedColor={selectedColor} onSelectColor={onColorChange} />
+            <ColorBar selectedColor={selectedColor} onSelectColor={onColorChange} colors={availableColors} />
 
             <View style={styles.viewSwitcher}>
               <TouchableOpacity

@@ -32,8 +32,25 @@ export function tintHex(userColor: string, grayHex: string): string {
   );
 }
 
-/** Replace every fill="#XXXXXX" in SVG string with tint(userColor, that gray). */
+const TINT_CACHE_MAX = 40;
+const tintCache = new Map<string, string>();
+
+function quickHash(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
+  return h >>> 0;
+}
+
+function tintCacheKey(svgString: string, userColor: string): string {
+  return `${userColor}:${svgString.length}:${quickHash(svgString)}`;
+}
+
+/** Replace every fill="#XXXXXX" in SVG string with tint(userColor, that gray). Cached for speed. */
 export function tintSvgFills(svgString: string, userColor: string): string {
+  const key = tintCacheKey(svgString, userColor);
+  const cached = tintCache.get(key);
+  if (cached !== undefined) return cached;
+
   const [uR, uG, uB] = parseHex(userColor);
   const uniqueHexes = [...new Set(svgString.match(/fill="(#[0-9a-fA-F]{6})"/g) ?? [])].map((m) => m.slice(6, -1));
   const tintMap = new Map<string, string>();
@@ -41,10 +58,16 @@ export function tintSvgFills(svgString: string, userColor: string): string {
     const [gR, gG, gB] = parseHex(grayHex);
     tintMap.set(grayHex, toHex((uR * gR) / 255, (uG * gG) / 255, (uB * gB) / 255));
   }
-  return svgString.replace(
+  const result = svgString.replace(
     /fill="(#[0-9a-fA-F]{6})"/g,
     (m, grayHex) => `fill="${tintMap.get(grayHex) ?? grayHex}"`
   );
+  if (tintCache.size >= TINT_CACHE_MAX) {
+    const first = tintCache.keys().next().value;
+    if (first !== undefined) tintCache.delete(first);
+  }
+  tintCache.set(key, result);
+  return result;
 }
 
 /**

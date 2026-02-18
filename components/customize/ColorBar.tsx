@@ -5,12 +5,15 @@ import { TSHIRT_COLORS } from "./types";
 type Props = {
   selectedColor: string;
   onSelectColor: (color: string) => void;
+  /** When provided (e.g. from productCustomization API), use these instead of default TSHIRT_COLORS. */
+  colors?: Array<{ hex: string; name?: string }>;
 };
 
-export function ColorBar({ selectedColor, onSelectColor }: Props) {
+export function ColorBar({ selectedColor, onSelectColor, colors: colorsProp }: Props) {
+  const colors = colorsProp?.length ? colorsProp.map((c) => c.hex) : [...TSHIRT_COLORS];
   return (
     <View style={styles.bar}>
-      {TSHIRT_COLORS.map((color) => (
+      {colors.map((color) => (
         <TouchableOpacity
           key={color}
           style={[
