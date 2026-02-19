@@ -27,6 +27,7 @@ import type {
 import * as ImagePicker from "expo-image-picker";
 import { CONTAINER_W, CONTAINER_H } from "@/components/customize/types";
 import { formatPriceMMK } from "@/lib/format";
+import { uploadDesignImage } from "@/lib/upload-design";
 
 function generateId() {
   return `el-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -45,7 +46,7 @@ export default function CustomizeScreen() {
   const [tshirtBodyColor, setTshirtBodyColor] = useState("#ffffff");
   const [tshirtSleeveColor, setTshirtSleeveColor] = useState("#ffffff");
   const [tshirtCollarColor, setTshirtCollarColor] = useState("#ffffff");
-  const [colorPart, setColorPart] = useState<"body" | "sleeves" | "collar">("body");
+  const [colorPart, setColorPart] = useState<string>("body");
   const [frontDesign, setFrontDesign] = useState<DesignElement[]>([]);
   const [backDesign, setBackDesign] = useState<DesignElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -63,6 +64,7 @@ export default function CustomizeScreen() {
   const [undoStack, setUndoStack] = useState<DesignElement[][]>([]);
   const [redoStack, setRedoStack] = useState<DesignElement[][]>([]);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const designEditorRef = useRef<DesignEditorRef>(null);
   const currentElementsRef = useRef<DesignElement[]>([]);
   const customizationColorsAppliedRef = useRef(false);
@@ -70,18 +72,78 @@ export default function CustomizeScreen() {
 
   const addToCartMutation = useMutation({
     mutationFn: async () => {
+      const base =
+        productDetail != null
+          ? Number(productDetail.sale_price ?? productDetail.price ?? 0)
+          : customization?.base_price != null
+            ? Number(customization.base_price)
+            : 0;
+      const colorP =
+        (productDetail?.colors?.find((c) => c.hex === tshirtBodyColor)?.price_delta ??
+          customization?.colors?.find((c) => c.hex === tshirtBodyColor)?.price_delta) ?? 0;
+      const clipTpl = [...frontDesign, ...backDesign].reduce((sum, el) => {
+        if (el.type !== "image" || !("sourceId" in el) || !el.sourceId) return sum;
+        const clip = clipartPriceBySourceId[el.sourceId];
+        const tpl = templatePriceBySourceId[el.sourceId];
+        return sum + (clip ?? 0) + (tpl ?? 0);
+      }, 0);
+      const finalTotal = base + colorP + clipTpl;
+      const baseImage = (productDetail as any)?.image_url ?? customization?.front_view?.image_url ?? null;
+      const baseImageBack = (productDetail as any)?.image_url ?? customization?.back_view?.image_url ?? null;
+
+      let frontImageUrl: string | null = baseImage;
+      let backImageUrl: string | null = baseImageBack;
+
+      const hasCustomDesign = frontDesign.length > 0 || backDesign.length > 0;
+      if (hasCustomDesign && designEditorRef.current) {
+        const prevView = view;
+        const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+        try {
+          setView("front");
+          await delay(300);
+          const frontPath = await designEditorRef.current.captureRendered();
+          setView("back");
+          await delay(300);
+          const backPath = await designEditorRef.current.captureRendered();
+          setView(prevView);
+
+          if (frontPath) {
+            const url = await uploadDesignImage(frontPath);
+            frontImageUrl = url;
+          }
+          if (backPath) {
+            const url = await uploadDesignImage(backPath);
+            backImageUrl = url;
+          }
+        } catch (_) {
+          setView(prevView);
+        }
+      }
+
+      const productOverride =
+        (productDetail ?? customization) && {
+          id: Number(id),
+          name: (productDetail?.name ?? customization?.product_name) || "Custom Product",
+          price: String(finalTotal),
+          image: frontImageUrl,
+          imageBack: backImageUrl,
+        };
       await apiRequest("POST", "/api/cart", {
         productId: Number(id),
         quantity: 1,
+        size: selectedSize ?? undefined,
+        color: customization?.colors?.find((c) => c.hex === tshirtBodyColor)?.name ?? tshirtBodyColor,
         customization: {
           bodyColor: tshirtBodyColor,
           sleeveColor: tshirtSleeveColor,
           collarColor: tshirtCollarColor,
           frontDesign,
           backDesign,
-          totalPrice,
+          totalPrice: finalTotal,
         },
-        customPrice: totalPrice.toFixed(2),
+        customPrice: String(finalTotal),
+        productOverride,
       });
     },
     onSuccess: () => {
@@ -96,10 +158,6 @@ export default function CustomizeScreen() {
     queryKey: ["productDetail", id],
     enabled: !!id,
   });
-  const basePrice = productDetail != null
-    ? Number(productDetail.sale_price ?? productDetail.price ?? 0)
-    : 0;
-
   const { data: clipartListData } = useQuery<{ cliparts: ClipartItem[] }>({
     queryKey: ["clipartList"],
   });
@@ -110,6 +168,12 @@ export default function CustomizeScreen() {
     queryKey: ["productCustomization", id],
     enabled: !!id,
   });
+  const basePrice =
+    productDetail != null
+      ? Number(productDetail.sale_price ?? productDetail.price ?? 0)
+      : customization?.base_price != null
+        ? Number(customization.base_price)
+        : 0;
   const cliparts: ClipartItem[] = clipartListData?.cliparts ?? [];
   const templates: TemplateItem[] = templateListData?.templates ?? [];
   const clipartPriceBySourceId = React.useMemo(
@@ -120,27 +184,6 @@ export default function CustomizeScreen() {
     () => Object.fromEntries(templates.map((t) => [`template-${t.id}`, t.price])),
     [templates]
   );
-
-  /** Template regions from API (Body / Sleeves / Collar) – only show regions present in template_regions. */
-  const templateRegions = React.useMemo((): { id: TshirtColorPart; label: string }[] => {
-    const front = customization?.template_regions?.front_regions;
-    if (!front || typeof front !== "object") {
-      return [{ id: "body", label: "Body" }, { id: "sleeves", label: "Sleeves" }, { id: "collar", label: "Collar" }];
-    }
-    const keys = Object.keys(front);
-    const partOrder: TshirtColorPart[] = ["body", "sleeves", "collar"];
-    const labelByPart: Record<TshirtColorPart, string> = { body: "Body", sleeves: "Sleeves", collar: "Collar" };
-    const hasPart = (part: TshirtColorPart): boolean => {
-      const k = part === "sleeves" ? "sleeve" : part;
-      return keys.some((key) => key.toLowerCase().includes(k));
-    };
-    return partOrder.filter(hasPart).map((id) => ({ id, label: labelByPart[id] }));
-  }, [customization?.template_regions?.front_regions]);
-
-  useEffect(() => {
-    const ids = templateRegions.map((r) => r.id);
-    if (ids.length && !ids.includes(colorPart)) setColorPart(ids[0]);
-  }, [templateRegions, colorPart]);
 
   useEffect(() => {
     if (!customization?.colors?.length || customizationColorsAppliedRef.current) return;
@@ -155,6 +198,13 @@ export default function CustomizeScreen() {
   useEffect(() => {
     customizationColorsAppliedRef.current = false;
   }, [id]);
+
+  const sizes = productDetail?.sizes ?? [];
+  useEffect(() => {
+    if (sizes.length > 0 && !selectedSize) {
+      setSelectedSize(sizes[0].name);
+    }
+  }, [sizes, selectedSize]);
 
   const baseUrl = getApiUrl();
   const customizeUrlBase =
@@ -175,11 +225,9 @@ export default function CustomizeScreen() {
 
   const currentElements = view === "front" ? frontDesign : backDesign;
 
-  const colorPrice = customization?.colors
-    ? (customization.colors.find((c) => c.hex === tshirtBodyColor)?.price_delta ?? 0) +
-    (customization.colors.find((c) => c.hex === tshirtSleeveColor)?.price_delta ?? 0) +
-    (customization.colors.find((c) => c.hex === tshirtCollarColor)?.price_delta ?? 0)
-    : 0;
+  const colorPrice =
+    (productDetail?.colors?.find((c) => c.hex === tshirtBodyColor)?.price_delta ??
+      customization?.colors?.find((c) => c.hex === tshirtBodyColor)?.price_delta) ?? 0;
   const clipartTemplatePrice = [...frontDesign, ...backDesign].reduce((sum, el) => {
     if (el.type !== "image" || !("sourceId" in el) || !el.sourceId) return sum;
     const clip = clipartPriceBySourceId[el.sourceId];
@@ -405,7 +453,7 @@ export default function CustomizeScreen() {
   const handleColorChange = useCallback((color: string) => {
     startTransition(() => {
       if (colorPart === "body") setTshirtBodyColor(color);
-      else if (colorPart === "sleeves") setTshirtSleeveColor(color);
+      else if (colorPart === "sleeves" || colorPart === "sleeve") setTshirtSleeveColor(color);
       else setTshirtCollarColor(color);
     });
   }, [colorPart]);
@@ -487,15 +535,16 @@ export default function CustomizeScreen() {
     );
   }
 
-  const TRANSPARENT_PIXEL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  const defaultFrontImage = require("@/assets/products/tshirt-front.png");
+  const defaultBackImage = require("@/assets/products/tshirt-back.png");
   const frontImage =
     customization?.front_view?.image_url
       ? { uri: customization.front_view.image_url }
-      : (image ? { uri: image as string } : { uri: TRANSPARENT_PIXEL });
+      : (image ? { uri: image as string } : defaultFrontImage);
   const backImage =
     customization?.back_view?.image_url
       ? { uri: customization.back_view.image_url }
-      : (imageBack ? { uri: imageBack as string } : { uri: TRANSPARENT_PIXEL });
+      : (imageBack ? { uri: imageBack as string } : defaultBackImage);
 
   return (
     <View style={styles.container}>
@@ -552,7 +601,6 @@ export default function CustomizeScreen() {
           onUpdateElement={handleUpdateElement}
           onDragStart={pushUndo}
           availableColors={customization?.colors?.map((c) => ({ hex: c.hex, name: c.name }))}
-          templateRegions={templateRegions}
         />
         <TouchableOpacity
           style={styles.preview3DWidget}
@@ -595,8 +643,37 @@ export default function CustomizeScreen() {
       </View>
 
       <View style={[styles.addToCartBar, { paddingBottom: insets.bottom + 12 }]}>
-        <Text style={styles.addToCartBarLabel}>Total</Text>
-        <Text style={styles.addToCartBarPrice}>{formatPriceMMK(totalPrice)}</Text>
+        {sizes.length > 0 && (
+          <View style={styles.sizeSelector}>
+            <Text style={styles.sizeLabel}>Size</Text>
+            <View style={styles.sizeChips}>
+              {sizes.map((s) => (
+                <TouchableOpacity
+                  key={s.id}
+                  style={[
+                    styles.sizeChip,
+                    selectedSize === s.name && styles.sizeChipSelected,
+                  ]}
+                  onPress={() => setSelectedSize(s.name)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.sizeChipText,
+                      selectedSize === s.name && styles.sizeChipTextSelected,
+                    ]}
+                  >
+                    {s.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+        <View style={styles.addToCartRow}>
+          <Text style={styles.addToCartBarLabel}>Total</Text>
+          <Text style={styles.addToCartBarPrice}>{formatPriceMMK(totalPrice)}</Text>
+        </View>
         <TouchableOpacity
           style={[styles.addToCartBarBtn, addedToCart && styles.addToCartBarBtnAdded]}
           onPress={() => addToCartMutation.mutate()}
@@ -654,7 +731,9 @@ export default function CustomizeScreen() {
           price: c.price,
           onPress: () => {
             handleClipartsClose();
-            addPresetImageFromUrl(c.file_url || c.thumbnail_url, `clipart-${c.id}`);
+            // Prefer PNG thumbnail over SVG file_url for faster display
+            const url = (c.file_url?.toLowerCase().endsWith(".svg") ? c.thumbnail_url : c.file_url) || c.thumbnail_url;
+            addPresetImageFromUrl(url, `clipart-${c.id}`);
           },
         }))}
       />
@@ -669,7 +748,9 @@ export default function CustomizeScreen() {
           price: t.price,
           onPress: () => {
             handleTemplateClose();
-            addPresetImageFromUrl(t.file_url || t.thumbnail_url, `template-${t.id}`);
+            // Prefer PNG thumbnail over SVG file_url for faster display
+            const url = (t.file_url?.toLowerCase().endsWith(".svg") ? t.thumbnail_url : t.file_url) || t.thumbnail_url;
+            addPresetImageFromUrl(url, `template-${t.id}`);
           },
         }))}
       />
@@ -721,10 +802,49 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
   },
-  addToCartBar: {
+  sizeSelector: {
+    marginBottom: 10,
+  },
+  sizeLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.8)",
+    marginBottom: 6,
+  },
+  sizeChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  sizeChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+  },
+  sizeChipSelected: {
+    backgroundColor: "rgba(255,255,255,0.35)",
+    borderColor: "#fff",
+  },
+  sizeChipText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255,255,255,0.9)",
+  },
+  sizeChipTextSelected: {
+    color: "#fff",
+  },
+  addToCartRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  addToCartBar: {
+    flexDirection: "column",
+    alignItems: "stretch",
     paddingHorizontal: 16,
     paddingTop: 12,
     backgroundColor: "#1a1a2e",

@@ -4,15 +4,6 @@ export type CustomizeMode = "design" | "preview";
 /** Which part of the shirt the color picker edits (body / sleeves / collar). */
 export type TshirtColorPart = "body" | "sleeves" | "collar";
 
-/** Region % for splitting one shirt image into collar / body / sleeves (0–1).
- *  Sleeve: အဲ့နားလောက်ထိဘဲ ယူချင်တာ – body/sleeve ကွေးကြောင်းလောက်ထိပဲ. */
-export const TSHIRT_REGIONS = {
-  collarHeight: 0.10,
-  collarWidth: 0.9,
-  /** Sleeve: ပုံထဲက ကွေးကြောင်း (body နဲ့ ဆက်တဲ့နား) လောက်ထိပဲ. */
-  sleeveWidth: 0.174,
-} as const;
-
 export type TextElement = {
   id: string;
   type: "text";

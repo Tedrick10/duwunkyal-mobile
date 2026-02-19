@@ -19,21 +19,21 @@ import Colors from "@/constants/colors";
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleLogin() {
-    if (!email.trim() || !password.trim()) {
-      setError("Please fill in all fields");
+    if (!phone.trim() || !password.trim()) {
+      setError("Please fill in phone and password");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      await login(email.trim(), password);
+      await login(phone.trim(), password);
       router.dismissAll();
     } catch (e: any) {
       setError(e.message);
@@ -69,18 +69,16 @@ export default function LoginScreen() {
           )}
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>Phone Number</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
+              <Ionicons name="call-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Enter Your Email"
+                placeholder="09 123 456 789"
                 placeholderTextColor={Colors.textLight}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
               />
             </View>
           </View>

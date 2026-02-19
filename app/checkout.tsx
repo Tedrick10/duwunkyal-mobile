@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Image,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -16,14 +17,24 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-client";
 import { formatPriceMMK } from "@/lib/format";
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const [address, setAddress] = useState(user?.address || "");
+  const [shippingName, setShippingName] = useState(user?.name ?? "");
+  const [shippingPhone, setShippingPhone] = useState(user?.phone ?? "");
+  const [shippingAddress, setShippingAddress] = useState(user?.address ?? "");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      setShippingName((prev) => prev || (user.name ?? ""));
+      setShippingPhone((prev) => prev || (user.phone ?? ""));
+      setShippingAddress((prev) => prev || (user.address ?? ""));
+    }
+  }, [user]);
 
   const { data: cartItems } = useQuery<any[]>({
     queryKey: ["/api/cart"],
@@ -33,29 +44,53 @@ export default function CheckoutScreen() {
   const total = cartItems
     ? cartItems.reduce(
       (sum, item) =>
-        sum + parseFloat(item.customPrice ?? item.product.price) * item.quantity,
+        sum + parseFloat(item.customPrice ?? item.product?.price ?? "0") * item.quantity,
       0
     )
     : 0;
 
-  const orderMutation = useMutation({
+  const orderMutation = useMutation<{ id: number; number?: string; total?: string }>({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/orders", { shippingAddress: address });
+      const res = await apiRequest("POST", "/api/orders", {
+        shippingAddress: shippingAddress.trim(),
+        shippingName: shippingName.trim() || undefined,
+        shippingPhone: shippingPhone.trim() || undefined,
+      });
+      if (!res.ok) throw new Error("Place order failed");
+      return (await res.json()) as { id: number; number?: string; total?: string };
     },
-    onSuccess: () => {
+    onSuccess: (order) => {
       queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace("/(tabs)/profile");
+      router.replace({
+        pathname: "/order-success",
+        params: {
+          id: String(order.id),
+          number: order.number ?? undefined,
+          total: order.total,
+        },
+      });
+    },
+    onError: (err) => {
+      setError((err as Error).message);
     },
   });
 
   function handleOrder() {
-    if (!address.trim()) {
+    setError("");
+    if (!shippingName.trim()) {
+      setError("Please enter your name");
+      return;
+    }
+    if (!shippingPhone.trim()) {
+      setError("Please enter your phone number");
+      return;
+    }
+    if (!shippingAddress.trim()) {
       setError("Please enter your shipping address");
       return;
     }
-    setError("");
     orderMutation.mutate();
   }
 
@@ -67,21 +102,54 @@ export default function CheckoutScreen() {
     >
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Order Summary</Text>
-        {cartItems?.map((item) => (
-          <View key={item.id} style={styles.summaryItem}>
-            <View style={styles.summaryLeft}>
-              <Text style={styles.summaryName} numberOfLines={1}>{item.product.name}</Text>
-              <Text style={styles.summaryVariant}>
-                Qty: {item.quantity}
-                {item.size ? ` | ${item.size}` : ""}
-                {item.color ? ` | ${item.color}` : ""}
-              </Text>
-            </View>
-            <Text style={styles.summaryPrice}>
-              {formatPriceMMK(parseFloat(item.customPrice ?? item.product.price) * item.quantity)}
-            </Text>
-          </View>
-        ))}
+        <View style={styles.summaryList}>
+          {cartItems?.map((item) => {
+            const isCustom = item.customization != null;
+            const price = parseFloat(item.customPrice ?? item.product?.price ?? "0") * item.quantity;
+            const imgFront = item.product?.image ?? item.product?.image_url;
+            const imgBack = item.product?.imageBack ?? item.product?.image_back;
+            return (
+              <View key={item.id} style={styles.summaryCard}>
+                <View style={styles.summaryImages}>
+                  {isCustom && imgFront && imgBack && imgBack !== imgFront ? (
+                    <>
+                      <Image
+                        source={getProductImageSource(imgFront)}
+                        style={styles.summaryImage}
+                        resizeMode="contain"
+                      />
+                      <Image
+                        source={getProductImageSource(imgBack)}
+                        style={[styles.summaryImage, styles.summaryImageSecond]}
+                        resizeMode="contain"
+                      />
+                    </>
+                  ) : (
+                    <Image
+                      source={getProductImageSource(imgFront || item.product?.image)}
+                      style={styles.summaryImage}
+                      resizeMode="contain"
+                    />
+                  )}
+                </View>
+                <View style={styles.summaryContent}>
+                  <Text style={styles.summaryName} numberOfLines={2}>
+                    {item.product?.name ?? "Product"}
+                  </Text>
+                  <Text style={styles.summaryVariant}>
+                    Qty: {item.quantity}
+                    {item.size ? ` • ${item.size}` : ""}
+                    {item.color ? ` • ${item.color}` : ""}
+                  </Text>
+                  {isCustom && (
+                    <Text style={styles.summaryCustom}>Custom design</Text>
+                  )}
+                </View>
+                <Text style={styles.summaryPrice}>{formatPriceMMK(price)}</Text>
+              </View>
+            );
+          })}
+        </View>
         <View style={styles.divider} />
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total</Text>
@@ -90,7 +158,7 @@ export default function CheckoutScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Shipping Address</Text>
+        <Text style={styles.sectionTitle}>Shipping Details</Text>
         {!!error && (
           <View style={styles.errorBox}>
             <Ionicons name="alert-circle" size={16} color={Colors.error} />
@@ -98,11 +166,26 @@ export default function CheckoutScreen() {
           </View>
         )}
         <TextInput
-          style={styles.addressInput}
-          placeholder="Enter your full shipping address"
+          style={styles.input}
+          placeholder="Full name *"
           placeholderTextColor={Colors.textLight}
-          value={address}
-          onChangeText={setAddress}
+          value={shippingName}
+          onChangeText={setShippingName}
+        />
+        <TextInput
+          style={[styles.input, { marginTop: 10 }]}
+          placeholder="Phone number *"
+          placeholderTextColor={Colors.textLight}
+          value={shippingPhone}
+          onChangeText={setShippingPhone}
+          keyboardType="phone-pad"
+        />
+        <TextInput
+          style={[styles.input, styles.addressInput, { marginTop: 10 }]}
+          placeholder="Full shipping address *"
+          placeholderTextColor={Colors.textLight}
+          value={shippingAddress}
+          onChangeText={setShippingAddress}
           multiline
           numberOfLines={3}
           textAlignVertical="top"
@@ -142,13 +225,34 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginBottom: 16,
   },
-  summaryItem: {
+  summaryList: {},
+  summaryCard: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
     marginBottom: 12,
   },
-  summaryLeft: { flex: 1, marginRight: 12 },
+  summaryImages: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  summaryImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    backgroundColor: Colors.productImageBg,
+  },
+  summaryImageSecond: {
+    marginLeft: 0,
+  },
+  summaryContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
   summaryName: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
@@ -160,6 +264,12 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  summaryCustom: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accent,
+    marginTop: 2,
+  },
   summaryPrice: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
@@ -168,7 +278,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: Colors.border,
-    marginVertical: 12,
+    marginVertical: 16,
   },
   totalRow: {
     flexDirection: "row",
@@ -199,7 +309,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_500Medium",
   },
-  addressInput: {
+  input: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
     borderWidth: 1,
@@ -208,6 +318,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: Colors.text,
+  },
+  addressInput: {
     minHeight: 80,
   },
   placeOrderBtn: {

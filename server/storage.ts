@@ -36,6 +36,25 @@ export async function getUserById(id: number): Promise<User | undefined> {
   return user;
 }
 
+export async function updateUser(
+  id: number,
+  data: { name?: string; email?: string; phone?: string | null; address?: string | null; password?: string }
+): Promise<User> {
+  const update: Record<string, unknown> = {};
+  if (data.name !== undefined) update.name = data.name;
+  if (data.email !== undefined) update.email = data.email;
+  if (data.phone !== undefined) update.phone = data.phone;
+  if (data.address !== undefined) update.address = data.address;
+  if (data.password !== undefined) update.password = data.password;
+  if (Object.keys(update).length === 0) {
+    const u = await getUserById(id);
+    if (!u) throw new Error("User not found");
+    return u;
+  }
+  const [user] = await db.update(users).set(update).where(eq(users.id, id)).returning();
+  return user;
+}
+
 export async function getAllUsers(): Promise<User[]> {
   return db.select().from(users).orderBy(desc(users.createdAt));
 }

@@ -53,7 +53,7 @@ export default function OrderDetailScreen() {
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       <View style={styles.card}>
         <View style={styles.orderHeader}>
-          <Text style={styles.orderTitle}>Order #{order.id}</Text>
+          <Text style={styles.orderTitle}>{order.number ?? `Order #${order.id}`}</Text>
           <View
             style={[
               styles.statusBadge,
@@ -74,33 +74,91 @@ export default function OrderDetailScreen() {
         </Text>
       </View>
 
-      {order.shippingAddress && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Shipping Address</Text>
-          <Text style={styles.addressText}>{order.shippingAddress}</Text>
-        </View>
-      )}
+      {(order.shippingAddress || order.shippingName || order.shippingPhone) && (() => {
+        let name = order.shippingName;
+        let phone = order.shippingPhone;
+        let address = order.shippingAddress;
+        const combined = address && (!name || !phone) && /^.+,.+,.+$/.test(address.trim());
+        if (combined) {
+          const parts = address!.split(",").map((s: string) => s.trim()).filter(Boolean);
+          if (parts.length >= 3 && /^\+?[\d\s-]+$/.test(parts[1].replace(/\s/g, ""))) {
+            name = parts[0];
+            phone = parts[1];
+            address = parts.slice(2).join(", ");
+          }
+        } else if (address && name && address.includes(name) && phone && address.includes(phone)) {
+          const parts = address.split(",").map((s: string) => s.trim()).filter(Boolean);
+          if (parts.length >= 3 && /^\+?[\d\s-]+$/.test(parts[1].replace(/\s/g, ""))) {
+            name = parts[0];
+            phone = parts[1];
+            address = parts.slice(2).join(", ");
+          }
+        }
+        const iconColor = "#60a5fa";
+        return (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Shipping Details</Text>
+            <>
+              {name && (
+                <View style={styles.shippingRow}>
+                  <Ionicons name="person-outline" size={18} color={iconColor} style={styles.shippingIcon} />
+                  <Text style={styles.addressText}>{name}</Text>
+                </View>
+              )}
+              {phone && (
+                <View style={[styles.shippingRow, { marginTop: 8 }]}>
+                  <Ionicons name="call-outline" size={18} color={iconColor} style={styles.shippingIcon} />
+                  <Text style={styles.addressText}>{phone}</Text>
+                </View>
+              )}
+              {address && (
+                <View style={[styles.shippingRow, { marginTop: 8 }]}>
+                  <Ionicons name="location-outline" size={18} color={iconColor} style={styles.shippingIcon} />
+                  <Text style={styles.addressText}>{address}</Text>
+                </View>
+              )}
+            </>
+          </View>
+        );
+      })()}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Items</Text>
-        {order.items?.map((item: any) => (
-          <View key={item.id} style={styles.item}>
-            {item.product?.image && (
-              <Image source={getProductImageSource(item.product?.image)} style={styles.itemImage} />
-            )}
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemName}>{item.product?.name || "Product"}</Text>
-              <Text style={styles.itemVariant}>
-                Qty: {item.quantity}
-                {item.size ? ` | ${item.size}` : ""}
-                {item.color ? ` | ${item.color}` : ""}
+        {order.items?.map((item: any) => {
+          const isCustom = !!item.customization;
+          const imgFront = item.product?.image ?? item.product?.image_url;
+          const imgBack = item.product?.imageBack ?? item.product?.image_back;
+          return (
+            <View key={item.id} style={styles.item}>
+              {isCustom && imgFront && imgBack && imgBack !== imgFront ? (
+                <View style={styles.itemImages}>
+                  <Image source={getProductImageSource(imgFront)} style={styles.itemImage} />
+                  <Image source={getProductImageSource(imgBack)} style={[styles.itemImage, styles.itemImageSecond]} />
+                </View>
+              ) : (imgFront || item.product?.image) ? (
+                <Image source={getProductImageSource(imgFront || item.product?.image)} style={styles.itemImage} />
+              ) : null}
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName}>{item.product?.name || "Product"}</Text>
+                <Text style={styles.itemVariant}>
+                  Qty: {item.quantity}
+                  {item.size ? ` • ${item.size}` : ""}
+                  {item.color ? ` • ${item.color}` : ""}
+                  {item.customization && " • Custom design"}
+                </Text>
+                {item.customization?.bodyColor && (
+                  <View style={styles.colorRow}>
+                    <View style={[styles.colorSwatch, { backgroundColor: item.customization.bodyColor }]} />
+                    <Text style={styles.colorText}>Color: {item.customization.bodyColor}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.itemPrice}>
+                {formatPriceMMK(parseFloat(item.price) * item.quantity)}
               </Text>
             </View>
-            <Text style={styles.itemPrice}>
-              {formatPriceMMK(parseFloat(item.price) * item.quantity)}
-            </Text>
-          </View>
-        ))}
+          );
+        })}
         <View style={styles.divider} />
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total</Text>
@@ -160,6 +218,13 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginBottom: 12,
   },
+  shippingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  shippingIcon: {
+    marginRight: 8,
+  },
   addressText: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
@@ -171,12 +236,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
+  itemImages: {
+    flexDirection: "row",
+    gap: 6,
+  },
   itemImage: {
     width: 52,
     height: 52,
     borderRadius: 10,
     backgroundColor: Colors.white,
     resizeMode: "contain",
+  },
+  itemImageSecond: {
+    marginLeft: 0,
   },
   itemInfo: { flex: 1, marginLeft: 12 },
   itemName: {
@@ -189,6 +261,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  colorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  colorSwatch: {
+    width: 14,
+    height: 14,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  colorText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
   },
   itemPrice: {
     fontSize: 14,

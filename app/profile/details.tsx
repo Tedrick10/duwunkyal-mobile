@@ -8,11 +8,11 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth-context";
 import { getImageUrl } from "@/lib/query-client";
 import { useTheme } from "@/lib/theme-context";
 import Colors from "@/constants/colors";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function PersonalInfoDetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -39,8 +39,8 @@ export default function PersonalInfoDetailsScreen() {
 
   const rows = [
     { label: "Full Name", value: user.name, icon: "person-outline" as const },
-    { label: "Email", value: user.email, icon: "mail-outline" as const },
     { label: "Phone", value: user.phone || "—", icon: "call-outline" as const },
+    { label: "Email", value: user.email || "—", icon: "mail-outline" as const },
   ];
 
   return (
@@ -66,7 +66,6 @@ export default function PersonalInfoDetailsScreen() {
           )}
         </View>
         <Text style={[styles.userName, { color: C.text }]}>{user.name}</Text>
-        {/* <Text style={[styles.userEmail, { color: C.textSecondary }]}>{user.email}</Text> */}
       </View>
 
       <View style={styles.section}>

@@ -13,7 +13,7 @@ import MaskedView from "@react-native-masked-view/masked-view";
 import ViewShot from "react-native-view-shot";
 import { SvgXml } from "react-native-svg";
 import { tintSvgFills, ensureSvgFits } from "@/lib/tintSvgFills";
-import { DesignElement, DesignView, TshirtColorPart, CONTAINER_W, CONTAINER_H, TSHIRT_REGIONS } from "./types";
+import { DesignElement, DesignView, TshirtColorPart, CONTAINER_W, CONTAINER_H } from "./types";
 import { ColorBar } from "./ColorBar";
 import { Toolbar } from "./Toolbar";
 import { TextModal } from "./TextModal";
@@ -25,8 +25,8 @@ type Props = {
   bodyColor: string;
   sleeveColor: string;
   collarColor: string;
-  colorPart: TshirtColorPart;
-  onColorPartChange: (part: TshirtColorPart) => void;
+  colorPart: string;
+  onColorPartChange: (part: string) => void;
   elements: DesignElement[];
   selectedId: string | null;
   textModalVisible: boolean;
@@ -59,11 +59,12 @@ type Props = {
   readOnly?: boolean;
   /** When provided (e.g. from productCustomization API), passed to ColorBar for region colors. */
   availableColors?: Array<{ hex: string; name?: string }>;
-  /** When provided (e.g. from productCustomization API), region buttons (Body/Sleeves/Collar) are bound to these. */
-  templateRegions?: Array<{ id: TshirtColorPart; label: string }>;
 };
 
-export type DesignEditorRef = { capture: () => Promise<string | undefined> };
+export type DesignEditorRef = {
+  capture: () => Promise<string | undefined>;
+  captureRendered: () => Promise<string | undefined>;
+};
 
 const DRAG_THRESHOLD = 5;
 const DEFAULT_TEXT_W = 120;
@@ -511,13 +512,10 @@ const DesignEditorInner = memo(function DesignEditorInner({
   onDragStart,
   readOnly = false,
   availableColors,
-  templateRegions,
   viewShotRef,
   captureShotRef,
 }: Props & { viewShotRef: React.RefObject<ViewShot | null>; captureShotRef: React.RefObject<ViewShot | null> }) {
-  const regionButtons = templateRegions?.length
-    ? templateRegions
-    : ([{ id: "body" as const, label: "Body" }, { id: "sleeves" as const, label: "Sleeves" }, { id: "collar" as const, label: "Collar" }]);
+  const regionButtons: Array<{ id: string; label: string }> = [];
 
   // Defer expensive SVG tint so Front/Back and color taps feel instant
   const deferredView = useDeferredValue(view);
@@ -527,11 +525,12 @@ const DesignEditorInner = memo(function DesignEditorInner({
 
   const deferredSilhouetteSource = deferredView === "front" ? frontImage : backImage;
   const deferredSvgSource = deferredView === "front" ? frontSvg : backSvg;
-  const selectedColor = colorPart === "body" ? bodyColor : colorPart === "sleeves" ? sleeveColor : collarColor;
-  const ch = CONTAINER_H * TSHIRT_REGIONS.collarHeight;
-  const sw = CONTAINER_W * TSHIRT_REGIONS.sleeveWidth;
-  const bodyW = CONTAINER_W - sw * 2;
-  const bodyH = CONTAINER_H - ch;
+  const selectedColor =
+    colorPart === "body"
+      ? bodyColor
+      : colorPart === "sleeves" || colorPart === "sleeve" || colorPart === "sleeve_left" || colorPart === "sleeve_right"
+        ? sleeveColor
+        : collarColor;
 
   const svgFitted = useMemo(
     () => (deferredSvgSource ? ensureSvgFits(deferredSvgSource) : null),
@@ -603,30 +602,8 @@ const DesignEditorInner = memo(function DesignEditorInner({
           style={[styles.tshirtContainer, { width: CONTAINER_W, height: CONTAINER_H }]}
         >
           <View style={[StyleSheet.absoluteFill, { width: CONTAINER_W, height: CONTAINER_H }]}>
-            {/* Same front/back image, 3 regions via overflow-hidden windows */}
-            {/* Collar: top strip */}
-            <View style={[styles.regionWindow, { top: 0, left: 0, width: CONTAINER_W, height: ch }]} pointerEvents="none">
-              <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: 0, top: 0 }]}>
-                {renderRegion(collarColor, `collar-${view}-${collarColor}`, "collar")}
-              </View>
-            </View>
-            {/* Body: center */}
-            <View style={[styles.regionWindow, { top: ch, left: sw, width: bodyW, height: bodyH }]} pointerEvents="none">
-              <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: -sw, top: -ch }]}>
-                {renderRegion(bodyColor, `body-${view}-${bodyColor}`, "body")}
-              </View>
-            </View>
-            {/* Left sleeve */}
-            <View style={[styles.regionWindow, { top: ch, left: 0, width: sw, height: bodyH }]} pointerEvents="none">
-              <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: 0, top: -ch }]}>
-                {renderRegion(sleeveColor, `sleeveL-${view}-${sleeveColor}`, "sleeve")}
-              </View>
-            </View>
-            {/* Right sleeve */}
-            <View style={[styles.regionWindow, { top: ch, left: CONTAINER_W - sw, width: sw, height: bodyH }]} pointerEvents="none">
-              <View style={[styles.regionMaskWrap, { width: CONTAINER_W, height: CONTAINER_H, left: -(CONTAINER_W - sw), top: -ch }]}>
-                {renderRegion(sleeveColor, `sleeveR-${view}-${sleeveColor}`, "sleeve")}
-              </View>
+            <View style={[StyleSheet.absoluteFill, { width: CONTAINER_W, height: CONTAINER_H }]} pointerEvents="none">
+              {renderRegion(deferredBodyColor, `shirt-${deferredView}`, "body")}
             </View>
             <View
               style={[styles.designLayer, { width: CONTAINER_W, height: CONTAINER_H }]}
@@ -722,6 +699,7 @@ const DesignEditorWithRef = forwardRef<DesignEditorRef, Props>(function DesignEd
   const captureShotRef = useRef<ViewShot>(null);
   useImperativeHandle(ref, () => ({
     capture: () => captureShotRef.current?.capture?.() ?? Promise.resolve(undefined),
+    captureRendered: () => viewShotRef.current?.capture?.() ?? Promise.resolve(undefined),
   }), []);
   return <DesignEditorInner {...props} viewShotRef={viewShotRef} captureShotRef={captureShotRef} />;
 });

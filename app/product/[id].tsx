@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  Alert,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
@@ -62,11 +63,24 @@ export default function ProductDetailScreen() {
 
   const addToCartMutation = useMutation({
     mutationFn: async () => {
+      const base = product != null ? Number(product.sale_price ?? product.price ?? 0) : 0;
+      const colorDelta = Number(selectedColorObj?.price_delta ?? 0);
+      const unitPrice = base + colorDelta;
+      const productOverride =
+        product && {
+          id: product.id,
+          name: product.name,
+          price: String(unitPrice),
+          image: selectedColorObj?.image_url ?? product.image_url ?? null,
+          imageBack: (product as any)?.image_back_url ?? product.image_url ?? null,
+        };
       await apiRequest("POST", "/api/cart", {
         productId: parseInt(id as string),
         quantity,
         size: selectedSize,
         color: selectedColor,
+        customPrice: String(unitPrice),
+        productOverride,
       });
     },
     onSuccess: () => {
@@ -74,6 +88,9 @@ export default function ProductDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setAddedToCart(true);
       setTimeout(() => setAddedToCart(false), 2000);
+    },
+    onError: (err) => {
+      Alert.alert("Add to Cart Failed", (err as Error).message);
     },
   });
 

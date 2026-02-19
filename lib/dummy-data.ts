@@ -68,7 +68,7 @@ export interface WishlistItemData {
 
 export interface UserData {
   id: number;
-  email: string;
+  email: string | null;
   name: string;
   phone: string | null;
   address: string | null;

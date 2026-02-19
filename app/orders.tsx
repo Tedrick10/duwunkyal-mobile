@@ -92,7 +92,7 @@ export default function OrdersScreen() {
         }}
       >
         <View style={styles.orderCardTop}>
-          <Text style={styles.orderNumber}>Order #{item.id}</Text>
+          <Text style={styles.orderNumber}>{item.number ?? `Order #${item.id}`}</Text>
           <View
             style={[
               styles.statusBadge,

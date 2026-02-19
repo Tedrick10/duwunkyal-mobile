@@ -81,6 +81,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@expo/ngrok": "^4.1.0",
+    "@types/connect-pg-simple": "^7.0.3",
     "@types/express": "^5.0.0",
     "@types/react": "~19.1.10",
     "@types/three": "^0.182.0",

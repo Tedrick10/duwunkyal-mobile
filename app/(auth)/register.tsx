@@ -51,27 +51,31 @@ export default function RegisterScreen() {
   }
 
   async function handleRegister() {
-    if (!name.trim() || !email.trim() || !password.trim() || !passwordConfirmation.trim()) {
-      setError("Please fill in all required fields");
+    if (!name.trim() || !phone.trim() || !password.trim() || !passwordConfirmation.trim()) {
+      setError("Please fill in name, phone, and password");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
       return;
     }
     if (password !== passwordConfirmation) {
       setError("Passwords do not match");
       return;
     }
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Please enter a valid email");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
       await register(
-        email.trim(),
+        phone.trim(),
         password,
         passwordConfirmation,
         name.trim(),
-        phone.trim() || undefined,
+        email.trim() || undefined,
         photoUri ?? undefined
       );
       router.dismissAll();
@@ -137,33 +141,33 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email *</Text>
+            <Text style={styles.label}>Phone Number *</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="call-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="09 123 456 789"
+                placeholderTextColor={Colors.textLight}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Email (optional)</Text>
             <View style={styles.inputContainer}>
               <Ionicons name="mail-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Enter Your Email"
+                placeholder="john@example.com"
                 placeholderTextColor={Colors.textLight}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phone</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="call-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter Your Phone Number"
-                placeholderTextColor={Colors.textLight}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
               />
             </View>
           </View>

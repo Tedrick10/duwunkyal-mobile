@@ -107,7 +107,9 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.profileInfo}>
           <Text style={[styles.profileName, { color: C.text }]}>{user.name}</Text>
-          <Text style={[styles.profileEmail, { color: C.textSecondary }]}>{user.email}</Text>
+          <Text style={[styles.profileEmail, { color: C.textSecondary }]}>
+            {user.phone || user.email || "—"}
+          </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={C.textLight} />
       </Pressable>
@@ -115,6 +117,17 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Pressable
           style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.85 }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/profile/edit");
+          }}
+        >
+          <Ionicons name="pencil-outline" size={22} color={C.accent} />
+          <Text style={[styles.menuItemText, { color: C.text, flex: 1 }]}>Edit Profile</Text>
+          <Ionicons name="chevron-forward" size={18} color={C.textLight} />
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight, marginTop: 10 }, pressed && { opacity: 0.85 }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/orders");
@@ -128,7 +141,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color={C.textLight} />
         </Pressable>
         <Pressable
-          style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.menuItem, { backgroundColor: C.surface, borderColor: C.borderLight, marginTop: 10 }, pressed && { opacity: 0.85 }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push("/wishlist");

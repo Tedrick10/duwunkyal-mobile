@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { queryClient } from "./query-client";
 import { LocalDataService } from "./local-data-service";
+import { setOnUnauthorized } from "./on-unauthorized";
 
 interface User {
   id: number;
-  email: string;
+  email: string | null;
   name: string;
   phone: string | null;
   address: string | null;
@@ -15,8 +17,8 @@ interface User {
 interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, passwordConfirmation: string, name: string, phone?: string, photoUri?: string) => Promise<void>;
+  login: (phone: string, password: string) => Promise<void>;
+  register: (phone: string, password: string, passwordConfirmation: string, name: string, email?: string, photoUri?: string) => Promise<void>;
   updateUser: (updates: { name?: string; email?: string; phone?: string; password?: string; password_confirmation?: string; photoUri?: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -32,6 +34,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
+  useEffect(() => {
+    setOnUnauthorized(async () => {
+      await AsyncStorage.removeItem(AUTH_KEY);
+      await LocalDataService.setStoredUser(null);
+      await LocalDataService.setStoredToken(null);
+      setUser(null);
+      await queryClient.removeQueries({ queryKey: ["/api/wishlist"] });
+      await queryClient.removeQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith?.("/api/wishlist/check") });
+      await queryClient.removeQueries({ queryKey: ["/api/cart"] });
+      await queryClient.removeQueries({ predicate: (q) => (q.queryKey[0] as string) === "/api/orders" });
+    });
+    return () => setOnUnauthorized(() => { });
+  }, []);
+
   async function checkAuth() {
     try {
       const u = await LocalDataService.getStoredUser();
@@ -42,27 +58,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function login(_email: string, _password: string) {
-    const u = await LocalDataService.login(_email, _password);
+  async function login(_phone: string, _password: string) {
+    const u = await LocalDataService.login(_phone, _password);
     await AsyncStorage.setItem(AUTH_KEY, "true");
     await LocalDataService.setStoredUser(u);
     setUser(u);
   }
 
   async function register(
-    _email: string,
+    _phone: string,
     _password: string,
     _passwordConfirmation: string,
     _name: string,
-    _phone?: string,
+    _email?: string,
     _photoUri?: string
   ) {
     const u = await LocalDataService.register(
-      _email,
+      _phone,
       _password,
       _passwordConfirmation,
       _name,
-      _phone,
+      _email,
       _photoUri
     );
     await AsyncStorage.setItem(AUTH_KEY, "true");
@@ -87,6 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await LocalDataService.setStoredUser(null);
     await LocalDataService.setStoredToken(null);
     setUser(null);
+    // Clear user-specific cache so next login shows fresh data
+    await queryClient.removeQueries({ queryKey: ["/api/wishlist"] });
+    await queryClient.removeQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith?.("/api/wishlist/check") });
+    await queryClient.removeQueries({ queryKey: ["/api/cart"] });
+    await queryClient.removeQueries({ predicate: (q) => (q.queryKey[0] as string) === "/api/orders" });
   }
 
   const value = useMemo(

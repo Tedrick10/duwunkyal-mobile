@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
 import { pool } from "./db";
 import * as storage from "./storage";
 import {
@@ -13,6 +14,11 @@ import {
   insertCartItemSchema,
   insertOrderSchema,
 } from "@shared/schema";
+
+function parseParamId(val: string | string[] | undefined): number {
+  const s = Array.isArray(val) ? val[0] : val ?? "";
+  return parseInt(s, 10);
+}
 
 declare module "express-session" {
   interface SessionData {
@@ -103,6 +109,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(userWithoutPassword);
   });
 
+  const updateProfileSchema = z
+    .object({
+      name: z.string().min(1).optional(),
+      email: z.string().email().optional(),
+      phone: z.string().nullable().optional(),
+      address: z.string().nullable().optional(),
+      password: z.string().min(6).optional(),
+      password_confirmation: z.string().optional(),
+    })
+    .refine((d: { password?: string; password_confirmation?: string }) => !d.password || (d.password && d.password === d.password_confirmation), {
+      message: "Passwords do not match",
+      path: ["password_confirmation"],
+    });
+
+  app.put("/api/auth/profile", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const parsed = updateProfileSchema.parse(req.body);
+      const updates: { name?: string; email?: string; phone?: string | null; address?: string | null; password?: string } = {};
+      if (parsed.name !== undefined) updates.name = parsed.name;
+      if (parsed.email !== undefined) updates.email = parsed.email;
+      if (parsed.phone !== undefined) updates.phone = parsed.phone;
+      if (parsed.address !== undefined) updates.address = parsed.address;
+      if (parsed.password) {
+        const hashedPassword = await bcrypt.hash(parsed.password, 10);
+        updates.password = hashedPassword;
+      }
+      const user = await storage.updateUser(req.session.userId!, updates);
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: error.errors?.[0]?.message || "Validation failed" });
+      }
+      res.status(400).json({ message: error.message || "Update failed" });
+    }
+  });
+
   app.post("/api/auth/logout", (req: Request, res: Response) => {
     req.session.destroy(() => {
       res.json({ message: "Logged out" });
@@ -125,12 +168,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/products/category/:categoryId", async (req: Request, res: Response) => {
-    const prods = await storage.getProductsByCategory(parseInt(req.params.categoryId));
+    const prods = await storage.getProductsByCategory(parseParamId(req.params.categoryId));
     res.json(prods);
   });
 
   app.get("/api/products/:id", async (req: Request, res: Response) => {
-    const product = await storage.getProductById(parseInt(req.params.id));
+    const product = await storage.getProductById(parseParamId(req.params.id));
     if (!product) return res.status(404).json({ message: "Product not found" });
     res.json(product);
   });
@@ -153,7 +196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/cart/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const { quantity } = req.body;
-      const item = await storage.updateCartItem(parseInt(req.params.id), quantity);
+      const item = await storage.updateCartItem(parseParamId(req.params.id), quantity);
       res.json(item);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -161,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/cart/:id", requireAuth, async (req: Request, res: Response) => {
-    await storage.removeCartItem(parseInt(req.params.id));
+    await storage.removeCartItem(parseParamId(req.params.id));
     res.json({ message: "Removed" });
   });
 
@@ -194,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/orders/:id", requireAuth, async (req: Request, res: Response) => {
-    const order = await storage.getOrderById(parseInt(req.params.id));
+    const order = await storage.getOrderById(parseParamId(req.params.id));
     if (!order) return res.status(404).json({ message: "Order not found" });
     const items = await storage.getOrderItems(order.id);
     res.json({ ...order, items });
@@ -218,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/orders/:id/status", requireAdmin, async (req: Request, res: Response) => {
     try {
       const { status } = req.body;
-      const order = await storage.updateOrderStatus(parseInt(req.params.id), status);
+      const order = await storage.updateOrderStatus(parseParamId(req.params.id), status);
       res.json(order);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -237,7 +280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/admin/categories/:id", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const cat = await storage.updateCategory(parseInt(req.params.id), req.body);
+      const cat = await storage.updateCategory(parseParamId(req.params.id), req.body);
       res.json(cat);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -245,7 +288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/admin/categories/:id", requireAdmin, async (req: Request, res: Response) => {
-    await storage.deleteCategory(parseInt(req.params.id));
+    await storage.deleteCategory(parseParamId(req.params.id));
     res.json({ message: "Deleted" });
   });
 
@@ -261,7 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/admin/products/:id", requireAdmin, async (req: Request, res: Response) => {
     try {
-      const product = await storage.updateProduct(parseInt(req.params.id), req.body);
+      const product = await storage.updateProduct(parseParamId(req.params.id), req.body);
       res.json(product);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -269,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/admin/products/:id", requireAdmin, async (req: Request, res: Response) => {
-    await storage.deleteProduct(parseInt(req.params.id));
+    await storage.deleteProduct(parseParamId(req.params.id));
     res.json({ message: "Deleted" });
   });
 
@@ -279,7 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/wishlist/check/:productId", requireAuth, async (req: Request, res: Response) => {
-    const inWishlist = await storage.isInWishlist(req.session.userId!, parseInt(req.params.productId));
+    const inWishlist = await storage.isInWishlist(req.session.userId!, parseParamId(req.params.productId));
     res.json({ inWishlist });
   });
 
@@ -294,7 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/wishlist/:productId", requireAuth, async (req: Request, res: Response) => {
-    await storage.removeFromWishlist(req.session.userId!, parseInt(req.params.productId));
+    await storage.removeFromWishlist(req.session.userId!, parseParamId(req.params.productId));
     res.json({ message: "Removed" });
   });
 

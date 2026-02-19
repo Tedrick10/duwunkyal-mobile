@@ -14,6 +14,7 @@ import {
 } from "./dummy-data";
 import type { CustomizationData } from "@/components/customize/types";
 import { apiUrl, apiMobileUrl } from "@/lib/api-config";
+import { triggerUnauthorized } from "@/lib/on-unauthorized";
 
 const STORAGE_KEYS = {
   CART: "@duwunkyaw_cart",
@@ -144,13 +145,31 @@ export const LocalDataService = {
     size?: string,
     color?: string,
     customization?: CustomizationData | null,
-    customPrice?: string | null
+    customPrice?: string | null,
+    productOverride?: { id: number; name: string; price: string; image: string | null; imageBack?: string | null }
   ): Promise<CartItemData> {
     const user = await getStoredUser();
     if (!user) throw new Error("Please log in to add to cart");
     const cart = await loadCart();
-    const product = PRODUCTS.find((p) => p.id === productId);
-    if (!product) throw new Error("Product not found");
+    let product = PRODUCTS.find((p) => p.id === productId);
+    if (productOverride) {
+      product = {
+        id: productOverride.id,
+        name: productOverride.name,
+        description: null,
+        price: productOverride.price,
+        image: productOverride.image,
+        imageBack: productOverride.imageBack ?? productOverride.image,
+        categoryId: product?.categoryId ?? null,
+        sizes: product?.sizes ?? null,
+        colors: product?.colors ?? null,
+        stock: product?.stock ?? 0,
+        featured: product?.featured ?? false,
+        createdAt: product?.createdAt ?? new Date().toISOString(),
+      };
+    } else if (!product) {
+      throw new Error("Product not found");
+    }
 
     if (!customization) {
       const existing = cart.find(
@@ -162,6 +181,8 @@ export const LocalDataService = {
       );
       if (existing) {
         existing.quantity += quantity;
+        if (customPrice != null) existing.customPrice = customPrice;
+        if (productOverride) existing.product = product;
         await saveCart();
         return existing;
       }
@@ -176,7 +197,11 @@ export const LocalDataService = {
       color: color || null,
       createdAt: new Date().toISOString(),
       product,
-      ...(customization ? { customization, customPrice: customPrice ?? String(customization.totalPrice) } : {}),
+      ...(customization
+        ? { customization, customPrice: customPrice ?? String(customization.totalPrice) }
+        : customPrice != null
+          ? { customPrice }
+          : {}),
     };
     cart.push(newItem);
     _cart = cart;
@@ -290,14 +315,14 @@ export const LocalDataService = {
     return setStoredUser(user);
   },
 
-  async login(_email: string, _password: string): Promise<UserData> {
+  async login(_phone: string, _password: string): Promise<UserData> {
     const url = apiMobileUrl("customerLogin");
     const headers: HeadersInit = {
       Accept: "application/json",
       "Content-Type": "application/json",
     };
     const body = JSON.stringify({
-      email: _email,
+      phone: _phone,
       password: _password,
     });
     const res = await fetch(url, { method: "POST", headers, body });
@@ -321,8 +346,8 @@ export const LocalDataService = {
     }
     if (text.trim().startsWith("<")) throw new Error("Invalid response from server.");
     const data = JSON.parse(text) as {
-      user?: { id: number; name: string; email: string; phone?: string | null; address?: string | null; photo_url?: string | null };
-      customer?: { id: number; name: string; email: string; phone: string | null; photo_url?: string | null };
+      user?: { id: number; name: string; email?: string | null; phone?: string | null; address?: string | null; photo_url?: string | null };
+      customer?: { id: number; name: string; email?: string | null; phone: string | null; photo_url?: string | null };
       token?: string;
       access_token?: string;
     };
@@ -332,8 +357,8 @@ export const LocalDataService = {
     if (token) await setStoredToken(token);
     const user: UserData = {
       id: u.id,
-      name: u.name,
-      email: u.email,
+      name: u.name ?? "",
+      email: u.email ?? null,
       phone: u.phone ?? null,
       address: "address" in u ? (u.address ?? null) : null,
       isAdmin: false,
@@ -343,11 +368,11 @@ export const LocalDataService = {
   },
 
   async register(
-    _email: string,
+    _phone: string,
     _password: string,
     _passwordConfirmation: string,
     _name: string,
-    _phone?: string,
+    _email?: string,
     _photoUri?: string
   ): Promise<UserData> {
     const url = apiMobileUrl("customerSignup");
@@ -355,10 +380,10 @@ export const LocalDataService = {
     if (_photoUri) {
       const formData = new FormData();
       formData.append("name", _name);
-      formData.append("email", _email);
+      formData.append("phone", _phone.trim());
       formData.append("password", _password);
       formData.append("password_confirmation", _passwordConfirmation);
-      formData.append("phone", _phone?.trim() || "");
+      if (_email?.trim()) formData.append("email", _email.trim());
       formData.append("photo", {
         uri: _photoUri,
         name: "photo.jpg",
@@ -376,10 +401,10 @@ export const LocalDataService = {
       };
       const body = JSON.stringify({
         name: _name,
-        email: _email,
+        phone: _phone.trim(),
         password: _password,
         password_confirmation: _passwordConfirmation,
-        phone: _phone?.trim() || "",
+        ...(_email?.trim() ? { email: _email.trim() } : {}),
       });
       res = await fetch(url, { method: "POST", headers, body });
     }
@@ -400,7 +425,7 @@ export const LocalDataService = {
     }
     const data = JSON.parse(text) as {
       message?: string;
-      customer?: { id: number; name: string; email: string; phone: string | null; photo_url?: string | null };
+      customer?: { id: number; name: string; email?: string | null; phone: string | null; photo_url?: string | null };
       token?: string;
       access_token?: string;
     };
@@ -410,8 +435,8 @@ export const LocalDataService = {
     if (token) await setStoredToken(token);
     const user: UserData = {
       id: customer.id,
-      name: customer.name,
-      email: customer.email,
+      name: customer.name ?? "",
+      email: customer.email ?? null,
       phone: customer.phone ?? null,
       address: null,
       isAdmin: false,
@@ -441,9 +466,9 @@ export const LocalDataService = {
     let res: Response;
     if (updates.photoUri) {
       const formData = new FormData();
-      formData.append("name", updates.name ?? "");
-      formData.append("email", updates.email ?? "");
-      formData.append("phone", updates.phone ?? "");
+      formData.append("name", String(updates.name ?? ""));
+      formData.append("email", String(updates.email ?? ""));
+      formData.append("phone", String(updates.phone ?? ""));
       if (updates.password) {
         formData.append("password", updates.password);
         formData.append("password_confirmation", updates.password_confirmation ?? "");
@@ -453,8 +478,9 @@ export const LocalDataService = {
         name: "photo.jpg",
         type: "image/jpeg",
       } as unknown as Blob);
+      formData.append("_method", "PATCH");
       res = await fetch(url, {
-        method: "PATCH",
+        method: "POST",
         headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: formData,
       });
@@ -465,23 +491,27 @@ export const LocalDataService = {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
       const body = JSON.stringify({
-        name: updates.name,
-        email: updates.email,
+        name: updates.name ?? "",
+        email: updates.email ?? "",
         phone: updates.phone ?? "",
         ...(updates.password ? { password: updates.password, password_confirmation: updates.password_confirmation } : {}),
       });
       res = await fetch(url, { method: "PATCH", headers, body });
     }
     const text = await res.text();
+    if (token && (res.status === 401 || res.status === 403)) {
+      await triggerUnauthorized();
+    }
     if (!res.ok) {
       let msg = "Update failed.";
       try {
         if (text.trim().startsWith("<")) throw new Error("Server returned HTML");
-        const data = JSON.parse(text);
-        if (data.message) msg = data.message;
-        else if (data.errors && typeof data.errors === "object") {
-          const first = Object.values(data.errors as Record<string, string[]>)[0];
-          msg = Array.isArray(first) ? first[0] : String(first);
+        const errData = JSON.parse(text) as { message?: string; errors?: Record<string, string[]> };
+        if (errData.errors && typeof errData.errors === "object") {
+          const all = Object.values(errData.errors).flat();
+          msg = all.length > 0 ? all.join(" ") : (errData.message ?? msg);
+        } else if (errData.message) {
+          msg = errData.message;
         }
       } catch (e) {
         if (e instanceof SyntaxError || (e as Error).message === "Server returned HTML") {
@@ -492,15 +522,20 @@ export const LocalDataService = {
     }
     if (text.trim().startsWith("<")) throw new Error("Invalid response from server.");
     const data = JSON.parse(text) as {
+      id?: number;
+      name?: string;
+      email?: string;
+      phone?: string | null;
+      photo_url?: string | null;
       user?: { id: number; name: string; email: string; phone?: string | null; address?: string | null; photo_url?: string | null };
       customer?: { id: number; name: string; email: string; phone: string | null; photo_url?: string | null };
     };
-    const u = data.user ?? data.customer;
-    if (!u) throw new Error("Invalid response from server.");
+    const u = data.user ?? data.customer ?? (data.id ? data : null);
+    if (!u || !u.id) throw new Error("Invalid response from server.");
     const user: UserData = {
       id: u.id,
-      name: u.name,
-      email: u.email,
+      name: u.name ?? "",
+      email: u.email ?? null,
       phone: u.phone ?? null,
       address: "address" in u ? (u.address ?? null) : null,
       isAdmin: false,

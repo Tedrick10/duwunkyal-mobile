@@ -2,6 +2,63 @@ import type { ImageSourcePropType } from "react-native";
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { API_BASE_URL, apiMobileUrl } from "@/lib/api-config";
 import { LocalDataService } from "./local-data-service";
+import { triggerUnauthorized } from "./on-unauthorized";
+
+/** Call mobile API with Bearer token. Returns response. Triggers auto-logout on 401/403 (e.g. account deactivated). */
+async function apiMobileRequest(
+  method: string,
+  path: string,
+  body?: unknown,
+  token?: string | null
+): Promise<Response> {
+  const t = token ?? (await LocalDataService.getStoredToken());
+  const url = apiMobileUrl(path.startsWith("api/") ? path.replace(/^api\/mobile\/?/, "") : path);
+  const headers: HeadersInit = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    ...(t ? { Authorization: `Bearer ${t}` } : {}),
+  };
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body != null ? JSON.stringify(body) : undefined,
+  });
+  if (t && (res.status === 401 || res.status === 403)) {
+    await triggerUnauthorized();
+  }
+  return res;
+}
+
+/** Normalize cart/order product: backend may return image_url, we use image for display */
+function normalizeProduct(p: any): any {
+  if (!p) return p;
+  return {
+    ...p,
+    image: p.image ?? p.image_url ?? null,
+    imageBack: p.imageBack ?? p.image_back ?? p.image ?? null,
+    price: typeof p.price === "number" ? String(p.price) : (p.price ?? "0"),
+  };
+}
+
+/** Normalize order: ensure items[].product has image/imageBack/price, merge productOverride when present */
+function normalizeOrder(order: any): any {
+  if (!order) return order;
+  const items = Array.isArray(order.items) ? order.items : [];
+  return {
+    ...order,
+    items: items.map((it: any) => {
+      const po = it.productOverride ?? it.product_override;
+      const merged = it.product
+        ? normalizeProduct({
+          ...it.product,
+          image: po?.image ?? it.product.image ?? it.product.image_url,
+          imageBack: po?.imageBack ?? po?.image_back ?? it.product.imageBack ?? it.product.image_back ?? it.product.image ?? it.product.image_url,
+        })
+        : it.product;
+      return { ...it, product: merged };
+    }),
+  };
+}
 
 export type CategoryItem = { id: number; name: string; slug: string; parent_id: number | null; image_url: string };
 
@@ -66,13 +123,19 @@ export type ProductDetail = {
   customize?: ProductDetailCustomize | null;
 };
 
-/** Region for product customization (body, sleeve_left, sleeve_right). */
+/** Region for product customization – rect (x,y,width,height) or ellipse (cx,cy,rx,ry). */
 export type ProductCustomizationRegion = {
-  x: number;
-  y: number;
   type: string;
-  width: number;
-  height: number;
+  /** Rect: top-left and size (0–100 %). */
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  /** Ellipse: center and radii (0–100 %). */
+  cx?: number;
+  cy?: number;
+  rx?: number;
+  name?: string;
 };
 
 export type ProductCustomizationView = {
@@ -103,14 +166,12 @@ export type ProductCustomization = {
   product_id: number;
   product_name: string;
   customize_enabled: boolean;
+  /** Base price from API when provided; otherwise use productDetail */
+  base_price?: number | null;
   front_view: ProductCustomizationView;
   back_view: ProductCustomizationView;
   view_3d: ProductCustomizationView3D | null;
   colors: ProductCustomizationColor[];
-  template_regions: {
-    front_regions: Record<string, ProductCustomizationRegion>;
-    back_regions: Record<string, ProductCustomizationRegion>;
-  };
 };
 
 export type ClipartItem = {
@@ -180,46 +241,164 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   if (route.startsWith("/api/cart") && method === "POST") {
-    const body = data as any;
+    const body = data as {
+      productId: number;
+      quantity?: number;
+      size?: string;
+      color?: string;
+      customization?: {
+        bodyColor?: string;
+        sleeveColor?: string;
+        collarColor?: string;
+        frontDesign?: unknown;
+        backDesign?: unknown;
+        totalPrice?: number;
+      } | null;
+      customPrice?: number | string | null;
+      productOverride?: { id?: number; name?: string; price?: string; image?: string | null; imageBack?: string | null } | null;
+    };
+    const token = await LocalDataService.getStoredToken();
+    if (token) {
+      const po = body.productOverride;
+      const productOverride =
+        po && typeof po === "object"
+          ? {
+            image: po.image ? (String(po.image).startsWith("http") ? po.image : getImageUrl(po.image)) : null,
+            imageBack: po.imageBack ? (String(po.imageBack).startsWith("http") ? po.imageBack : getImageUrl(po.imageBack)) : null,
+          }
+          : { image: null, imageBack: null };
+      const cust = body.customization;
+      const customization =
+        cust && typeof cust === "object"
+          ? {
+            bodyColor: cust.bodyColor ?? null,
+            sleeveColor: cust.sleeveColor ?? null,
+            collarColor: cust.collarColor ?? null,
+            frontDesign: cust.frontDesign ?? null,
+            backDesign: cust.backDesign ?? null,
+            totalPrice: cust.totalPrice ?? null,
+          }
+          : null;
+      const customPriceVal = body.customPrice != null ? (typeof body.customPrice === "number" ? body.customPrice : Number(body.customPrice) || body.customPrice) : null;
+      const payload: Record<string, unknown> = {
+        productId: body.productId,
+        quantity: body.quantity ?? 1,
+        size: body.size ?? null,
+        color: body.color ?? null,
+        customPrice: customPriceVal,
+        customization,
+        productOverride,
+      };
+      const res = await apiMobileRequest("POST", "cart", payload, token);
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        const msg =
+          typeof err?.message === "string"
+            ? err.message
+            : err?.errors && typeof err.errors === "object"
+              ? String(Object.values(err.errors as Record<string, string[]>).flat()[0] ?? "Add to cart failed")
+              : "Add to cart failed";
+        throw new Error(msg);
+      }
+      return res;
+    }
     await LocalDataService.addToCart(
       body.productId,
       body.quantity || 1,
-      body.size,
-      body.color,
-      body.customization ?? null,
-      body.customPrice ?? null
+      body.size ?? "",
+      body.color ?? "",
+      (body.customization ?? null) as any,
+      body.customPrice != null ? String(body.customPrice) : null,
+      (body.productOverride ?? undefined) as any
     );
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
 
   if (route.match(/^\/api\/cart\/\d+$/) && method === "PUT") {
     const id = parseInt(route.split("/").pop()!);
-    const body = data as any;
+    const body = data as { quantity: number };
+    const token = await LocalDataService.getStoredToken();
+    if (token) {
+      const res = await apiMobileRequest("PUT", `cart/${id}`, { quantity: body.quantity }, token);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any)?.message ?? "Update cart failed");
+      }
+      return res;
+    }
     await LocalDataService.updateCartItem(id, body.quantity);
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
 
   if (route.match(/^\/api\/cart\/\d+$/) && method === "DELETE") {
     const id = parseInt(route.split("/").pop()!);
+    const token = await LocalDataService.getStoredToken();
+    if (token) {
+      const res = await apiMobileRequest("DELETE", `cart/${id}`, undefined, token);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any)?.message ?? "Remove from cart failed");
+      }
+      return res;
+    }
     await LocalDataService.removeCartItem(id);
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
 
   if (route === "/api/orders" && method === "POST") {
-    const body = data as any;
-    const order = await LocalDataService.placeOrder(body.shippingAddress);
+    const body = data as { shippingAddress: string; shippingName?: string; shippingPhone?: string };
+    const token = await LocalDataService.getStoredToken();
+    if (token) {
+      const payload = {
+        shippingAddress: body.shippingAddress ?? "",
+        ...(body.shippingName && { shippingName: body.shippingName }),
+        ...(body.shippingPhone && { shippingPhone: body.shippingPhone }),
+      };
+      const res = await apiMobileRequest("POST", "orders", payload, token);
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        const msg =
+          typeof err?.message === "string"
+            ? err.message
+            : err?.errors && typeof err.errors === "object"
+              ? String(Object.values(err.errors as Record<string, string[]>).flat()[0] ?? "Place order failed")
+              : "Place order failed";
+        throw new Error(msg);
+      }
+      return res;
+    }
+    const addr = [body.shippingName, body.shippingPhone, body.shippingAddress].filter(Boolean).join(", ") || body.shippingAddress;
+    const order = await LocalDataService.placeOrder(addr);
     return new Response(JSON.stringify(order), { status: 200 });
   }
 
   if (route === "/api/wishlist" && method === "POST") {
-    const body = data as any;
+    const body = data as { productId: number };
+    const token = await LocalDataService.getStoredToken();
+    if (token) {
+      const res = await apiMobileRequest("POST", "wishlist", { productId: body.productId }, token);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any)?.message ?? "Add to wishlist failed");
+      }
+      return res;
+    }
     await LocalDataService.addToWishlist(body.productId);
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
 
   if (route.match(/^\/api\/wishlist\/\d+$/) && method === "DELETE") {
-    const productId = parseInt(route.split("/").pop()!);
-    await LocalDataService.removeFromWishlist(productId);
+    const idFromPath = parseInt(route.split("/").pop()!);
+    const token = await LocalDataService.getStoredToken();
+    if (token) {
+      const res = await apiMobileRequest("DELETE", `wishlist/${idFromPath}`, undefined, token);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any)?.message ?? "Remove from wishlist failed");
+      }
+      return res;
+    }
+    await LocalDataService.removeFromWishlist(idFromPath);
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
 
@@ -374,24 +553,107 @@ export const getQueryFn: <T>(options: {
       }
 
       if (route === "/api/cart") {
+        const token = await LocalDataService.getStoredToken();
+        if (token) {
+          const res = await apiMobileRequest("GET", "cart", undefined, token);
+          if (!res.ok) {
+            if (res.status === 401) {
+              if (unauthorizedBehavior === "throw") throw new Error("Unauthorized");
+              return [] as any;
+            }
+            throw new Error("Cart fetch failed");
+          }
+          const list = (await res.json()) as any[];
+          return (Array.isArray(list) ? list : []).map((item) => {
+            const snap = item.product_snapshot ?? item.productSnapshot;
+            const po = item.productOverride ?? item.product_override;
+            const merged = item.product
+              ? normalizeProduct({
+                ...item.product,
+                image: po?.image ?? snap?.image ?? item.product.image ?? item.product.image_url,
+                imageBack: po?.imageBack ?? po?.image_back ?? snap?.imageBack ?? snap?.image_back ?? item.product.imageBack ?? item.product.image_back ?? item.product.image ?? item.product.image_url,
+              })
+              : item.product;
+            return { ...item, product: merged };
+          }) as any;
+        }
         return (await LocalDataService.getCart()) as any;
       }
 
       if (route === "/api/orders") {
+        const token = await LocalDataService.getStoredToken();
+        if (token) {
+          const res = await apiMobileRequest("GET", "orders", undefined, token);
+          if (!res.ok) {
+            if (res.status === 401) {
+              if (unauthorizedBehavior === "throw") throw new Error("Unauthorized");
+              return [] as any;
+            }
+            throw new Error("Orders fetch failed");
+          }
+          const list = (await res.json()) as any[];
+          return (Array.isArray(list) ? list : []).map(normalizeOrder) as any;
+        }
         return (await LocalDataService.getOrders()) as any;
       }
 
       if (route.match(/^\/api\/orders\/\d+$/)) {
         const id = parseInt(route.split("/").pop()!);
+        const token = await LocalDataService.getStoredToken();
+        if (token) {
+          const res = await apiMobileRequest("GET", `orders/${id}`, undefined, token);
+          if (!res.ok) {
+            if (res.status === 401) {
+              if (unauthorizedBehavior === "throw") throw new Error("Unauthorized");
+              return null as any;
+            }
+            throw new Error("Order fetch failed");
+          }
+          const order = await res.json();
+          return (order ? normalizeOrder(order) : null) as any;
+        }
         return ((await LocalDataService.getOrderById(id)) || null) as any;
       }
 
       if (route === "/api/wishlist") {
+        const token = await LocalDataService.getStoredToken();
+        if (token) {
+          const res = await apiMobileRequest("GET", "wishlist", undefined, token);
+          if (!res.ok) {
+            if (res.status === 401) {
+              if (unauthorizedBehavior === "throw") throw new Error("Unauthorized");
+              return [] as any;
+            }
+            throw new Error("Wishlist fetch failed");
+          }
+          const list = (await res.json()) as any[];
+          return (list ?? []).map((item) => ({
+            ...item,
+            product: item.product ? normalizeProduct(item.product) : item.product,
+          })) as any;
+        }
         return (await LocalDataService.getWishlist()) as any;
       }
 
       if (route.match(/^\/api\/wishlist\/check\/\d+$/)) {
         const productId = parseInt(route.split("/").pop()!);
+        const token = await LocalDataService.getStoredToken();
+        if (token) {
+          const res = await apiMobileRequest(
+            "GET",
+            `wishlist/check/${productId}`,
+            undefined,
+            token
+          );
+          if (!res.ok) {
+            if (res.status === 401) {
+              if (unauthorizedBehavior === "throw") throw new Error("Unauthorized");
+              return { inWishlist: false } as any;
+            }
+            throw new Error("Wishlist check failed");
+          }
+          return (await res.json()) as { inWishlist: boolean };
+        }
         const inWishlist = await LocalDataService.isInWishlist(productId);
         return { inWishlist } as any;
       }
