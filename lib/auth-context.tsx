@@ -18,8 +18,8 @@ interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   login: (phone: string, password: string) => Promise<void>;
-  register: (phone: string, password: string, passwordConfirmation: string, name: string, email?: string, photoUri?: string) => Promise<void>;
-  updateUser: (updates: { name?: string; email?: string; phone?: string; password?: string; password_confirmation?: string; photoUri?: string }) => Promise<void>;
+  register: (phone: string, password: string, passwordConfirmation: string, name: string, email?: string, address?: string, photoUri?: string) => Promise<void>;
+  updateUser: (updates: { name?: string; email?: string; phone?: string; address?: string; password?: string; password_confirmation?: string; photoUri?: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -63,6 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.setItem(AUTH_KEY, "true");
     await LocalDataService.setStoredUser(u);
     setUser(u);
+    await queryClient.invalidateQueries({ queryKey: ["productList"] });
+    await queryClient.invalidateQueries({ queryKey: ["featuredProductList"] });
+    await queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith?.("productListByCategory/") });
   }
 
   async function register(
@@ -71,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     _passwordConfirmation: string,
     _name: string,
     _email?: string,
+    _address?: string,
     _photoUri?: string
   ) {
     const u = await LocalDataService.register(
@@ -79,11 +83,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       _passwordConfirmation,
       _name,
       _email,
+      _address,
       _photoUri
     );
     await AsyncStorage.setItem(AUTH_KEY, "true");
     await LocalDataService.setStoredUser(u);
     setUser(u);
+    await queryClient.invalidateQueries({ queryKey: ["productList"] });
+    await queryClient.invalidateQueries({ queryKey: ["featuredProductList"] });
+    await queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith?.("productListByCategory/") });
   }
 
   async function updateUser(updates: {
@@ -108,6 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await queryClient.removeQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith?.("/api/wishlist/check") });
     await queryClient.removeQueries({ queryKey: ["/api/cart"] });
     await queryClient.removeQueries({ predicate: (q) => (q.queryKey[0] as string) === "/api/orders" });
+    await queryClient.invalidateQueries({ queryKey: ["productList"] });
+    await queryClient.invalidateQueries({ queryKey: ["featuredProductList"] });
+    await queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith?.("productListByCategory/") });
   }
 
   const value = useMemo(

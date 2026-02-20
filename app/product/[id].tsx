@@ -19,7 +19,9 @@ import * as Haptics from "expo-haptics";
 import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient, getProductImageSource, type ProductDetail, type ProductDetailColor } from "@/lib/query-client";
+import { CartIconWithBadge } from "@/components/CartIconWithBadge";
 import { formatPriceMMK } from "@/lib/format";
+import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 
 const { width } = Dimensions.get("window");
 
@@ -33,11 +35,15 @@ export default function ProductDetailScreen() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [saleType, setSaleType] = useState<"regular" | "rentals" | "wholesale">("regular");
   const [addedToCart, setAddedToCart] = useState(false);
+  const [showRequiredAlert, setShowRequiredAlert] = useState(false);
 
-  const { data: product, isLoading } = useQuery<ProductDetail | null>({
+  const { data: product, isLoading, isError, error } = useQuery<ProductDetail | null>({
     queryKey: ["productDetail", id],
   });
+
+  const loginRequired = isError && (error as any)?.loginRequired === true;
 
   const { data: wishlistStatus } = useQuery<{ inWishlist: boolean }>({
     queryKey: ["/api/wishlist/check", id],
@@ -63,7 +69,8 @@ export default function ProductDetailScreen() {
 
   const addToCartMutation = useMutation({
     mutationFn: async () => {
-      const base = product != null ? Number(product.sale_price ?? product.price ?? 0) : 0;
+      const qty = product?.stock != null ? Math.min(Math.max(quantity, effectiveMinQty), product.stock) : quantity;
+      const base = effectivePrice;
       const colorDelta = Number(selectedColorObj?.price_delta ?? 0);
       const unitPrice = base + colorDelta;
       const productOverride =
@@ -76,7 +83,7 @@ export default function ProductDetailScreen() {
         };
       await apiRequest("POST", "/api/cart", {
         productId: parseInt(id as string),
-        quantity,
+        quantity: qty,
         size: selectedSize,
         color: selectedColor,
         customPrice: String(unitPrice),
@@ -98,9 +105,36 @@ export default function ProductDetailScreen() {
   const colors: ProductDetailColor[] = product?.colors ?? [];
   const selectedColorObj = colors.find((c) => c.name === selectedColor);
 
+  const rentalsMin = product?.retail_min_qty ?? 1;
+  const wholesaleMin = product?.wholesale_min_qty ?? 1;
+  const canShowRentals = (product?.rentals_price != null) && (product?.rentals_price > 0);
+  const canShowWholesale = (product?.wholesale_price != null) && (product?.wholesale_price > 0);
+  const effectiveMinQty =
+    saleType === "regular" ? 1 : saleType === "rentals" ? rentalsMin : wholesaleMin;
+  const effectivePrice =
+    saleType === "wholesale" && product?.wholesale_price != null
+      ? Number(product.wholesale_price)
+      : saleType === "rentals" && product?.rentals_price != null
+        ? Number(product.rentals_price)
+        : Number(product?.sale_price ?? product?.price ?? 0);
+
   useEffect(() => {
     initialColorSetRef.current = false;
   }, [id]);
+
+  useEffect(() => {
+    if (showRequiredAlert) {
+      const t = setTimeout(() => setShowRequiredAlert(false), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [showRequiredAlert]);
+
+  useEffect(() => {
+    if (!product) return;
+    const min = effectiveMinQty;
+    const max = product.stock;
+    setQuantity((q) => Math.min(max, Math.max(min, q)));
+  }, [saleType, product?.id, product?.stock, effectiveMinQty]);
 
   useEffect(() => {
     if (!product || initialColorSetRef.current || !paramColor?.trim()) return;
@@ -115,9 +149,17 @@ export default function ProductDetailScreen() {
     }
   }, [product, paramColor]);
 
+  const sizeRequired = sizes.length > 0 && !selectedSize;
+  const colorRequired = colors.length > 0 && !selectedColor;
+  const canAddToCart = !sizeRequired && !colorRequired;
+
   function handleAddToCart() {
     if (!user) {
       router.push("/(auth)/login");
+      return;
+    }
+    if (sizeRequired || colorRequired) {
+      setShowRequiredAlert(true);
       return;
     }
     addToCartMutation.mutate();
@@ -129,6 +171,36 @@ export default function ProductDetailScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.accent} />
           <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (loginRequired) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
+        <View style={[styles.loadingContainer, { flex: 1, justifyContent: "center", gap: 16 }]}>
+          <Ionicons name="lock-closed" size={48} color={Colors.accent} />
+          <Text style={[styles.errorText, { textAlign: "center" }]}>
+            Sign in to view this product
+          </Text>
+          <Text style={[styles.loadingText, { fontSize: 14 }]}>
+            This product is only available to registered users.
+          </Text>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
+            <Pressable
+              style={[styles.addToCartBtn, { flex: 1 }]}
+              onPress={() => router.push("/(auth)/login")}
+            >
+              <Text style={styles.addToCartText}>Sign In</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.addToCartBtn, { flex: 1, backgroundColor: Colors.surface }]}
+              onPress={() => router.push("/(auth)/register")}
+            >
+              <Text style={[styles.addToCartText, { color: Colors.accent }]}>Create Account</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     );
@@ -150,12 +222,11 @@ export default function ProductDetailScreen() {
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={Colors.text} />
         </Pressable>
-        <Pressable
-          style={styles.backBtn}
+        <CartIconWithBadge
           onPress={() => router.push("/(tabs)/cart")}
-        >
-          <Ionicons name="bag-outline" size={22} color={Colors.text} />
-        </Pressable>
+          color={Colors.text}
+          size={22}
+        />
       </View>
 
       <ScrollView
@@ -188,9 +259,69 @@ export default function ProductDetailScreen() {
 
         <View style={styles.infoSection}>
           <Text style={styles.productName}>{product.name}</Text>
-          <Text style={styles.productPrice}>
-            {formatPriceMMK(product.sale_price ?? product.price)}
-          </Text>
+
+          <View style={styles.saleTypeSection}>
+            <Text style={styles.optionLabel}>Sale Type</Text>
+            <View style={styles.saleTypeRow}>
+              <Pressable
+                style={[styles.saleTypeChip, saleType === "regular" && styles.saleTypeChipActive]}
+                onPress={() => {
+                  setSaleType("regular");
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+              >
+                <Text style={[styles.saleTypeChipText, saleType === "regular" && styles.saleTypeChipTextActive]}>
+                  Regular Sale
+                </Text>
+              </Pressable>
+              {canShowRentals && (
+                <Pressable
+                  style={[styles.saleTypeChip, saleType === "rentals" && styles.saleTypeChipActive]}
+                  onPress={() => {
+                    setSaleType("rentals");
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
+                  <Text style={[styles.saleTypeChipText, saleType === "rentals" && styles.saleTypeChipTextActive]}>
+                    Rentals
+                  </Text>
+                </Pressable>
+              )}
+              {canShowWholesale && (
+                <Pressable
+                  style={[styles.saleTypeChip, saleType === "wholesale" && styles.saleTypeChipActive]}
+                  onPress={() => {
+                    setSaleType("wholesale");
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
+                  <Text style={[styles.saleTypeChipText, saleType === "wholesale" && styles.saleTypeChipTextActive]}>
+                    Whole Sale
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.priceRow}>
+            <Text style={styles.priceLabel}>
+              {saleType === "regular"
+                ? "Regular"
+                : saleType === "rentals"
+                  ? "Rentals"
+                  : "Wholesale"}{" "}
+              Price
+            </Text>
+            {saleType === "regular" && product.sale_price != null && product.sale_price < product.price ? (
+              <View style={styles.priceDisplayRow}>
+                <ProductPriceDisplay price={product.price} salePrice={product.sale_price} size="large" />
+              </View>
+            ) : (
+              <Text style={styles.priceValue}>{formatPriceMMK(effectivePrice)}</Text>
+            )}
+            <Text style={styles.minQtyHint}>Min. order: {effectiveMinQty} {effectiveMinQty === 1 ? "item" : "items"}</Text>
+          </View>
+
 
           {product.description && (
             <Text style={styles.description}>{product.description}</Text>
@@ -198,7 +329,7 @@ export default function ProductDetailScreen() {
 
           {sizes.length > 0 && (
             <View style={styles.optionSection}>
-              <Text style={styles.optionLabel}>Size</Text>
+              <Text style={styles.optionLabel}>Size *</Text>
               <View style={styles.optionRow}>
                 {sizes.map((size) => (
                   <Pressable
@@ -209,6 +340,7 @@ export default function ProductDetailScreen() {
                     ]}
                     onPress={() => {
                       setSelectedSize(size);
+                      setShowRequiredAlert(false);
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }}
                   >
@@ -228,7 +360,7 @@ export default function ProductDetailScreen() {
 
           {colors.length > 0 && (
             <View style={styles.optionSection}>
-              <Text style={styles.optionLabel}>Color</Text>
+              <Text style={styles.optionLabel}>Color *</Text>
               <View style={styles.colorSwatchRow}>
                 {colors.map((color) => {
                   const hex = color.hex || "#9e9e9e";
@@ -242,6 +374,7 @@ export default function ProductDetailScreen() {
                       ]}
                       onPress={() => {
                         setSelectedColor(color.name);
+                        setShowRequiredAlert(false);
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       }}
                     >
@@ -260,28 +393,33 @@ export default function ProductDetailScreen() {
           )}
 
           <View style={styles.optionSection}>
-            <Text style={styles.optionLabel}>Quantity</Text>
+            <Text style={styles.optionLabel}>Quantity (min. {effectiveMinQty})</Text>
             <View style={styles.qtyRow}>
               <Pressable
-                style={styles.qtyBtn}
+                style={[styles.qtyBtn, quantity <= effectiveMinQty && styles.qtyBtnDisabled]}
+                disabled={quantity <= effectiveMinQty}
                 onPress={() => {
-                  if (quantity > 1) {
+                  if (quantity > effectiveMinQty) {
                     setQuantity(quantity - 1);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   }
                 }}
               >
-                <Ionicons name="remove" size={18} color={Colors.text} />
+                <Ionicons name="remove" size={18} color={quantity <= effectiveMinQty ? Colors.textSecondary : Colors.text} />
               </Pressable>
               <Text style={styles.qtyText}>{quantity}</Text>
               <Pressable
-                style={styles.qtyBtn}
+                style={[styles.qtyBtn, quantity >= product.stock && styles.qtyBtnDisabled]}
+                disabled={quantity >= product.stock}
                 onPress={() => {
-                  setQuantity(quantity + 1);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  const max = product?.stock ?? 99;
+                  if (quantity < max) {
+                    setQuantity(quantity + 1);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }
                 }}
               >
-                <Ionicons name="add" size={18} color={Colors.text} />
+                <Ionicons name="add" size={18} color={quantity >= (product?.stock ?? 0) ? Colors.textSecondary : Colors.text} />
               </Pressable>
             </View>
           </View>
@@ -329,7 +467,7 @@ export default function ProductDetailScreen() {
           <Text style={styles.bottomPriceLabel}>Total</Text>
           <Text style={styles.bottomPriceValue}>
             {formatPriceMMK(
-              (Number(product.sale_price ?? product.price) + Number(selectedColorObj?.price_delta ?? 0)) * quantity
+              (effectivePrice + Number(selectedColorObj?.price_delta ?? 0)) * quantity
             )}
           </Text>
         </View>
@@ -358,6 +496,12 @@ export default function ProductDetailScreen() {
           )}
         </Pressable>
       </View>
+
+      {showRequiredAlert && (
+        <View style={[styles.requiredAlertBanner, { bottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 90 }]}>
+          <Text style={styles.requiredAlertText}>Please choose size or color</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -431,11 +575,78 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginBottom: 6,
   },
-  productPrice: {
+  saleTypeSection: {
+    marginBottom: 16,
+  },
+  saleTypeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  saleTypeChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  saleTypeChipActive: {
+    borderColor: Colors.accent,
+    backgroundColor: `${Colors.accent}15`,
+  },
+  saleTypeChipText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  saleTypeChipTextActive: {
+    color: Colors.accent,
+  },
+  priceRow: {
+    marginBottom: 12,
+  },
+  priceDisplayRow: {
+    marginVertical: 2,
+  },
+  priceLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+    marginBottom: 2,
+  },
+  priceValue: {
     fontSize: 22,
     fontFamily: "Inter_700Bold",
     color: Colors.accent,
+  },
+  minQtyHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 4,
+  },
+  extraPricesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
     marginBottom: 12,
+  },
+  extraPriceItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  extraPriceLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
+  extraPriceValue: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
   },
   description: {
     fontSize: 14,
@@ -450,6 +661,26 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     marginBottom: 10,
+  },
+  requiredAlertBanner: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    backgroundColor: Colors.error,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  requiredAlertText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+    textAlign: "center",
   },
   optionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   sizeChip: {
@@ -507,6 +738,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     alignItems: "center",
     justifyContent: "center",
+  },
+  qtyBtnDisabled: {
+    opacity: 0.6,
   },
   qtyText: {
     fontSize: 16,

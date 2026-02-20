@@ -43,6 +43,7 @@ export interface OrderData {
   total: string;
   status: string;
   shippingAddress: string | null;
+  notes?: string | null;
   createdAt: string;
   items: OrderItemData[];
 }

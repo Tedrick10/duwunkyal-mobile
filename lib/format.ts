@@ -1,8 +1,8 @@
 /**
- * Format price for display in MMK (e.g. 12000, 13,500).
+ * Format price for display in Ks (e.g. 12,000 Ks, 13,500 Ks).
  * Rounds to integer, no decimals, with thousands separator.
  */
 export function formatPriceMMK(price: string | number): string {
   const n = Math.round(Number(price));
-  return "MMK " + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  return n.toLocaleString(undefined, { maximumFractionDigits: 0 }) + " Ks";
 }

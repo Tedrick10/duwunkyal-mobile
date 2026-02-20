@@ -13,7 +13,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { getApiUrl, apiRequest, queryClient, type ClipartItem, type TemplateItem, type ProductCustomization, type ProductDetail } from "@/lib/query-client";
+import { getApiUrl, getImageUrl, apiRequest, queryClient, type ClipartItem, type TemplateItem, type ProductCustomization, type ProductDetail } from "@/lib/query-client";
 import { DesignEditor, type DesignEditorRef } from "@/components/customize/DesignEditor";
 import { Preview3D } from "@/components/customize/Preview3D";
 import { ImageLibraryModal } from "@/components/customize/ImageLibraryModal";
@@ -25,6 +25,8 @@ import type {
   TshirtColorPart,
 } from "@/components/customize/types";
 import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
+import * as Haptics from "expo-haptics";
 import { CONTAINER_W, CONTAINER_H } from "@/components/customize/types";
 import { formatPriceMMK } from "@/lib/format";
 import { uploadDesignImage } from "@/lib/upload-design";
@@ -164,10 +166,12 @@ export default function CustomizeScreen() {
   const { data: templateListData } = useQuery<{ templates: TemplateItem[] }>({
     queryKey: ["templateList"],
   });
-  const { data: customization, isLoading: customizationLoading } = useQuery<ProductCustomization>({
+  const { data: customization, isLoading: customizationLoading, isError: customizationError, error: customizationErr } = useQuery<ProductCustomization>({
     queryKey: ["productCustomization", id],
     enabled: !!id,
   });
+
+  const customizeLoginRequired = !!id && customizationError && (customizationErr as any)?.loginRequired === true;
   const basePrice =
     productDetail != null
       ? Number(productDetail.sale_price ?? productDetail.price ?? 0)
@@ -446,9 +450,55 @@ export default function CustomizeScreen() {
     setSelectedId(null);
   }, [redoStack, currentElements, view]);
 
-  const handleSave = useCallback(() => {
-    Alert.alert("Save", "Design saved. (Export image can be added later.)");
-  }, []);
+  const handleSave = useCallback(async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("Save", "Saving to gallery is not available on web. Use the mobile app to save designs.", [{ text: "OK" }]);
+      return;
+    }
+    if (!designEditorRef.current) {
+      Alert.alert("Error", "Unable to capture design.");
+      return;
+    }
+    const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const prevView = view;
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission needed",
+          "Please allow access to your photo library to save designs.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+      setView("front");
+      await delay(300);
+      const frontPath = await designEditorRef.current.captureRendered();
+      setView("back");
+      await delay(300);
+      const backPath = await designEditorRef.current.captureRendered();
+      setView(prevView);
+
+      const saveToGallery = async (path: string | undefined): Promise<boolean> => {
+        if (!path) return false;
+        const uri = path.startsWith("file://") ? path : `file://${path}`;
+        await MediaLibrary.createAssetAsync(uri);
+        return true;
+      };
+
+      const frontSaved = await saveToGallery(frontPath);
+      const backSaved = await saveToGallery(backPath);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (frontSaved || backSaved) {
+        Alert.alert("Saved", "Your design has been saved to your photo gallery.", [{ text: "OK" }]);
+      } else {
+        Alert.alert("Save", "Unable to capture design images.", [{ text: "OK" }]);
+      }
+    } catch (err) {
+      setView(prevView);
+      Alert.alert("Error", (err as Error)?.message ?? "Failed to save to gallery.", [{ text: "OK" }]);
+    }
+  }, [view]);
 
   const handleColorChange = useCallback((color: string) => {
     startTransition(() => {
@@ -518,6 +568,44 @@ export default function CustomizeScreen() {
     );
   }
 
+  if (customizeLoginRequired) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <View style={[styles.nativeHeader, { paddingTop: insets.top }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={22} color="#fff" />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 24 }}>
+          <Ionicons name="lock-closed" size={48} color={Colors.accent} />
+          <Text style={{ fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.text, textAlign: "center" }}>
+            Sign in to customize this product
+          </Text>
+          <Text style={{ fontSize: 14, color: Colors.textSecondary, textAlign: "center" }}>
+            This product requires an account to customize.
+          </Text>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
+            <TouchableOpacity
+              style={[styles.saveBtn, { paddingHorizontal: 24 }]}
+              onPress={() => router.push("/(auth)/login")}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.saveBtnText}>Sign In</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.retryBtn, { paddingHorizontal: 24 }]}
+              onPress={() => router.push("/(auth)/register")}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.retryBtnText}>Create Account</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   if (id && customizationLoading) {
     return (
       <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
@@ -537,14 +625,16 @@ export default function CustomizeScreen() {
 
   const defaultFrontImage = require("@/assets/products/tshirt-front.png");
   const defaultBackImage = require("@/assets/products/tshirt-back.png");
-  const frontImage =
-    customization?.front_view?.image_url
-      ? { uri: customization.front_view.image_url }
-      : (image ? { uri: image as string } : defaultFrontImage);
-  const backImage =
-    customization?.back_view?.image_url
-      ? { uri: customization.back_view.image_url }
-      : (imageBack ? { uri: imageBack as string } : defaultBackImage);
+  const frontImageSrc =
+    customization?.front_view?.image_url ?? (image as string) ?? null;
+  const backImageSrc =
+    customization?.back_view?.image_url ?? (imageBack as string) ?? null;
+  const frontImage = frontImageSrc
+    ? { uri: getImageUrl(frontImageSrc) }
+    : defaultFrontImage;
+  const backImage = backImageSrc
+    ? { uri: getImageUrl(backImageSrc) }
+    : defaultBackImage;
 
   return (
     <View style={styles.container}>
@@ -601,6 +691,7 @@ export default function CustomizeScreen() {
           onUpdateElement={handleUpdateElement}
           onDragStart={pushUndo}
           availableColors={customization?.colors?.map((c) => ({ hex: c.hex, name: c.name }))}
+          displayBaseImageAsPhoto={!!(frontImageSrc || backImageSrc) && !(customization?.colors?.length)}
         />
         <TouchableOpacity
           style={styles.preview3DWidget}
@@ -645,7 +736,7 @@ export default function CustomizeScreen() {
       <View style={[styles.addToCartBar, { paddingBottom: insets.bottom + 12 }]}>
         {sizes.length > 0 && (
           <View style={styles.sizeSelector}>
-            <Text style={styles.sizeLabel}>Size</Text>
+            <Text style={styles.sizeLabel}>Size *</Text>
             <View style={styles.sizeChips}>
               {sizes.map((s) => (
                 <TouchableOpacity
@@ -676,8 +767,14 @@ export default function CustomizeScreen() {
         </View>
         <TouchableOpacity
           style={[styles.addToCartBarBtn, addedToCart && styles.addToCartBarBtnAdded]}
-          onPress={() => addToCartMutation.mutate()}
-          disabled={addToCartMutation.isPending}
+          onPress={() => {
+            if (sizes.length > 0 && !selectedSize) {
+              Alert.alert("Size Required", "Please select a size.");
+              return;
+            }
+            addToCartMutation.mutate();
+          }}
+          disabled={addToCartMutation.isPending || (sizes.length > 0 && !selectedSize)}
           activeOpacity={0.85}
         >
           <Text style={styles.addToCartBarBtnText}>

@@ -115,6 +115,8 @@ export type ProductDetail = {
   rentals_price: number | null;
   wholesale_price: number | null;
   stock: number;
+  retail_min_qty: number | null;
+  wholesale_min_qty: number | null;
   featured: boolean;
   sizes: ProductDetailSize[];
   colors: ProductDetailColor[];
@@ -346,13 +348,14 @@ export async function apiRequest(
   }
 
   if (route === "/api/orders" && method === "POST") {
-    const body = data as { shippingAddress: string; shippingName?: string; shippingPhone?: string };
+    const body = data as { shippingAddress: string; shippingName?: string; shippingPhone?: string; notes?: string };
     const token = await LocalDataService.getStoredToken();
     if (token) {
       const payload = {
         shippingAddress: body.shippingAddress ?? "",
         ...(body.shippingName && { shippingName: body.shippingName }),
         ...(body.shippingPhone && { shippingPhone: body.shippingPhone }),
+        ...(body.notes && { notes: body.notes }),
       };
       const res = await apiMobileRequest("POST", "orders", payload, token);
       if (!res.ok) {
@@ -368,7 +371,7 @@ export async function apiRequest(
       return res;
     }
     const addr = [body.shippingName, body.shippingPhone, body.shippingAddress].filter(Boolean).join(", ") || body.shippingAddress;
-    const order = await LocalDataService.placeOrder(addr);
+    const order = await LocalDataService.placeOrder(addr, body.notes);
     return new Response(JSON.stringify(order), { status: 200 });
   }
 
@@ -433,10 +436,27 @@ export const getQueryFn: <T>(options: {
 
       if (route.startsWith("productDetail/")) {
         const productId = route.replace("productDetail/", "");
+        const token = await LocalDataService.getStoredToken();
+        const headers: HeadersInit = {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
         const res = await fetch(apiMobileUrl(`productDetail/${productId}`), {
           method: "GET",
-          headers: { Accept: "application/json" },
+          headers,
         });
+        if (res.status === 403) {
+          try {
+            const json = await res.json();
+            if (json.login_required) {
+              const err = new Error(json.message || "Login required to view this product.");
+              (err as any).loginRequired = true;
+              throw err;
+            }
+          } catch (e) {
+            if ((e as any)?.loginRequired) throw e;
+          }
+        }
         if (!res.ok) throw new Error("Product detail failed");
         const json = await res.json();
         return (json.product ?? null) as ProductDetail | null;
@@ -444,19 +464,41 @@ export const getQueryFn: <T>(options: {
 
       if (route.startsWith("productCustomization/")) {
         const productId = route.replace("productCustomization/", "");
+        const token = await LocalDataService.getStoredToken();
+        const headers: HeadersInit = {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
         const res = await fetch(apiMobileUrl(`productCustomization/${productId}`), {
           method: "GET",
-          headers: { Accept: "application/json" },
+          headers,
         });
+        if (res.status === 403) {
+          try {
+            const json = await res.json();
+            if (json.login_required) {
+              const err = new Error(json.message || "Login required to view this product.");
+              (err as any).loginRequired = true;
+              throw err;
+            }
+          } catch (e) {
+            if ((e as any)?.loginRequired) throw e;
+          }
+        }
         if (!res.ok) throw new Error("Product customization failed");
         const json = await res.json();
         return json as ProductCustomization;
       }
 
       if (route === "productList") {
+        const token = await LocalDataService.getStoredToken();
+        const headers: HeadersInit = {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
         const res = await fetch(apiMobileUrl("productList"), {
           method: "GET",
-          headers: { Accept: "application/json" },
+          headers,
         });
         if (!res.ok) throw new Error("Product list failed");
         const json = await res.json();
@@ -470,9 +512,14 @@ export const getQueryFn: <T>(options: {
       }
 
       if (route === "featuredProductList") {
+        const token = await LocalDataService.getStoredToken();
+        const headers: HeadersInit = {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
         const res = await fetch(apiMobileUrl("featuredProductList"), {
           method: "GET",
-          headers: { Accept: "application/json" },
+          headers,
         });
         if (!res.ok) throw new Error("Featured product list failed");
         const json = await res.json();
@@ -519,9 +566,14 @@ export const getQueryFn: <T>(options: {
 
       if (route.startsWith("productListByCategory/")) {
         const categoryId = route.replace("productListByCategory/", "");
+        const token = await LocalDataService.getStoredToken();
+        const headers: HeadersInit = {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
         const res = await fetch(apiMobileUrl(`productList?category_id=${categoryId}`), {
           method: "GET",
-          headers: { Accept: "application/json" },
+          headers,
         });
         if (!res.ok) throw new Error("Category product list failed");
         const json = await res.json();
@@ -663,10 +715,22 @@ export const getQueryFn: <T>(options: {
 
 export function getImageUrl(path: string | null | undefined): string {
   if (!path) return "";
-  if (path.startsWith("http://") || path.startsWith("https://")) return path;
   try {
     const base = getApiUrl();
-    return `${base.replace(/\/$/, "")}${path}`;
+    const baseOrigin = base.replace(/\/$/, "");
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      const url = new URL(path);
+      if (
+        url.hostname === "127.0.0.1" ||
+        url.hostname === "localhost" ||
+        url.hostname === "0.0.0.0"
+      ) {
+        const baseUrl = new URL(baseOrigin);
+        return path.replace(url.origin, baseUrl.origin);
+      }
+      return path;
+    }
+    return `${baseOrigin}${path.startsWith("/") ? path : `/${path}`}`;
   } catch {
     return path;
   }

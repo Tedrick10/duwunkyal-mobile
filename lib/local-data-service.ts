@@ -171,6 +171,9 @@ export const LocalDataService = {
       throw new Error("Product not found");
     }
 
+    const stock = product?.stock;
+    const maxQty = stock != null ? stock : 99;
+
     if (!customization) {
       const existing = cart.find(
         (item) =>
@@ -180,7 +183,7 @@ export const LocalDataService = {
           item.color === (color || null)
       );
       if (existing) {
-        existing.quantity += quantity;
+        existing.quantity = Math.min(existing.quantity + quantity, maxQty);
         if (customPrice != null) existing.customPrice = customPrice;
         if (productOverride) existing.product = product;
         await saveCart();
@@ -192,7 +195,7 @@ export const LocalDataService = {
       id: _nextCartId++,
       userId: user.id,
       productId,
-      quantity,
+      quantity: Math.min(quantity, maxQty),
       size: size || null,
       color: color || null,
       createdAt: new Date().toISOString(),
@@ -213,7 +216,9 @@ export const LocalDataService = {
     const cart = await loadCart();
     const item = cart.find((i) => i.id === id);
     if (item) {
-      item.quantity = quantity;
+      const stock = item.product?.stock;
+      const maxQty = stock != null ? stock : 99;
+      item.quantity = Math.min(quantity, maxQty);
       await saveCart();
     }
   },
@@ -233,7 +238,7 @@ export const LocalDataService = {
     return orders.find((o) => o.id === id);
   },
 
-  async placeOrder(shippingAddress: string): Promise<OrderData> {
+  async placeOrder(shippingAddress: string, notes?: string): Promise<OrderData> {
     const user = await getStoredUser();
     if (!user) throw new Error("Please log in to place an order");
     const cart = await loadCart();
@@ -250,6 +255,7 @@ export const LocalDataService = {
       total: total.toFixed(2),
       status: "pending",
       shippingAddress,
+      notes: notes?.trim() || null,
       createdAt: new Date().toISOString(),
       items: cart.map((item, idx) => ({
         id: _nextOrderId * 100 + idx,
@@ -347,7 +353,7 @@ export const LocalDataService = {
     if (text.trim().startsWith("<")) throw new Error("Invalid response from server.");
     const data = JSON.parse(text) as {
       user?: { id: number; name: string; email?: string | null; phone?: string | null; address?: string | null; photo_url?: string | null };
-      customer?: { id: number; name: string; email?: string | null; phone: string | null; photo_url?: string | null };
+      customer?: { id: number; name: string; email?: string | null; phone: string | null; address?: string | null; photo_url?: string | null };
       token?: string;
       access_token?: string;
     };
@@ -373,6 +379,7 @@ export const LocalDataService = {
     _passwordConfirmation: string,
     _name: string,
     _email?: string,
+    _address?: string,
     _photoUri?: string
   ): Promise<UserData> {
     const url = apiMobileUrl("customerSignup");
@@ -384,6 +391,7 @@ export const LocalDataService = {
       formData.append("password", _password);
       formData.append("password_confirmation", _passwordConfirmation);
       if (_email?.trim()) formData.append("email", _email.trim());
+      if (_address?.trim()) formData.append("address", _address.trim());
       formData.append("photo", {
         uri: _photoUri,
         name: "photo.jpg",
@@ -405,6 +413,7 @@ export const LocalDataService = {
         password: _password,
         password_confirmation: _passwordConfirmation,
         ...(_email?.trim() ? { email: _email.trim() } : {}),
+        ...(_address?.trim() ? { address: _address.trim() } : {}),
       });
       res = await fetch(url, { method: "POST", headers, body });
     }
@@ -425,7 +434,7 @@ export const LocalDataService = {
     }
     const data = JSON.parse(text) as {
       message?: string;
-      customer?: { id: number; name: string; email?: string | null; phone: string | null; photo_url?: string | null };
+      customer?: { id: number; name: string; email?: string | null; phone: string | null; address?: string | null; photo_url?: string | null };
       token?: string;
       access_token?: string;
     };
@@ -438,7 +447,7 @@ export const LocalDataService = {
       name: customer.name ?? "",
       email: customer.email ?? null,
       phone: customer.phone ?? null,
-      address: null,
+      address: customer.address ?? null,
       isAdmin: false,
       photo_url: customer.photo_url ?? null,
     };
@@ -457,6 +466,7 @@ export const LocalDataService = {
     name?: string;
     email?: string;
     phone?: string;
+    address?: string;
     password?: string;
     password_confirmation?: string;
     photoUri?: string;
@@ -469,6 +479,7 @@ export const LocalDataService = {
       formData.append("name", String(updates.name ?? ""));
       formData.append("email", String(updates.email ?? ""));
       formData.append("phone", String(updates.phone ?? ""));
+      if (updates.address !== undefined) formData.append("address", updates.address);
       if (updates.password) {
         formData.append("password", updates.password);
         formData.append("password_confirmation", updates.password_confirmation ?? "");
@@ -494,6 +505,7 @@ export const LocalDataService = {
         name: updates.name ?? "",
         email: updates.email ?? "",
         phone: updates.phone ?? "",
+        ...(updates.address !== undefined ? { address: updates.address } : {}),
         ...(updates.password ? { password: updates.password, password_confirmation: updates.password_confirmation } : {}),
       });
       res = await fetch(url, { method: "PATCH", headers, body });

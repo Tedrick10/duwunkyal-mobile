@@ -59,6 +59,8 @@ type Props = {
   readOnly?: boolean;
   /** When provided (e.g. from productCustomization API), passed to ColorBar for region colors. */
   availableColors?: Array<{ hex: string; name?: string }>;
+  /** When true, display front/back images as-is from backend (no mask/color overlay). Use for full product photos. */
+  displayBaseImageAsPhoto?: boolean;
 };
 
 export type DesignEditorRef = {
@@ -512,6 +514,7 @@ const DesignEditorInner = memo(function DesignEditorInner({
   onDragStart,
   readOnly = false,
   availableColors,
+  displayBaseImageAsPhoto = false,
   viewShotRef,
   captureShotRef,
 }: Props & { viewShotRef: React.RefObject<ViewShot | null>; captureShotRef: React.RefObject<ViewShot | null> }) {
@@ -550,6 +553,17 @@ const DesignEditorInner = memo(function DesignEditorInner({
   );
 
   const renderRegion = (color: string, key: string, region: "collar" | "body" | "sleeve") => {
+    const src = deferredSilhouetteSource;
+    if (displayBaseImageAsPhoto) {
+      return (
+        <Image
+          key={key}
+          source={src}
+          style={[StyleSheet.absoluteFill, styles.tshirtBg]}
+          resizeMode="contain"
+        />
+      );
+    }
     const tintedSvg =
       region === "collar" ? tintedCollarSvg : region === "body" ? tintedBodySvg : tintedSleeveSvg;
     if (tintedSvg) {
@@ -563,7 +577,37 @@ const DesignEditorInner = memo(function DesignEditorInner({
         />
       );
     }
-    const src = deferredSilhouetteSource;
+    const applyColorOverBackendImage =
+      !deferredSvgSource && src && typeof (src as any)?.uri === "string";
+    if (applyColorOverBackendImage) {
+      return (
+        <MaskedView
+          key={key}
+          style={[StyleSheet.absoluteFill, styles.tshirtBg]}
+          maskElement={
+            <Image source={src} style={[StyleSheet.absoluteFill, styles.tshirtBg]} resizeMode="contain" />
+          }
+        >
+          <View style={[StyleSheet.absoluteFill, styles.tshirtBg]}>
+            <Image
+              source={src}
+              style={[StyleSheet.absoluteFill, styles.tshirtBg]}
+              resizeMode="contain"
+            />
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.tshirtBg,
+                {
+                  backgroundColor: color,
+                  opacity: 0.5,
+                },
+              ]}
+            />
+          </View>
+        </MaskedView>
+      );
+    }
     return Platform.OS === "web" ? (
       <Image
         key={key}

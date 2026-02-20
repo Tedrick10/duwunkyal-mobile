@@ -2,14 +2,46 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { NativeTabs, Icon, Label, Badge } from "expo-router/unstable-native-tabs";
 import { BlurView } from "expo-blur";
-import { Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import Colors from "@/constants/colors";
 import { useTheme } from "@/lib/theme-context";
+import { useCartQuantity } from "@/components/CartIconWithBadge";
+
+function TabCartIconWithBadge({ color, focused }: { color: string; focused?: boolean }) {
+  const quantity = useCartQuantity();
+  return (
+    <View style={badgeStyles.wrapper}>
+      <Ionicons name={focused ? "bag" : "bag-outline"} size={22} color={color} />
+      <View style={[badgeStyles.badge, quantity === 0 && badgeStyles.badgeZero]}>
+        <Text style={badgeStyles.badgeText}>{quantity}</Text>
+      </View>
+    </View>
+  );
+}
+
+const badgeStyles = StyleSheet.create({
+  wrapper: { position: "relative" as const },
+  badge: {
+    position: "absolute" as const,
+    top: -6,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.accent,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingHorizontal: 4,
+  },
+  badgeZero: { backgroundColor: Colors.textLight },
+  badgeText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#fff" },
+});
 
 function NativeTabLayout() {
+  const quantity = useCartQuantity();
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
@@ -21,6 +53,7 @@ function NativeTabLayout() {
         <Label>Search</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="cart">
+        <Badge>{String(quantity)}</Badge>
         <Icon sf={{ default: "bag", selected: "bag.fill" }} />
         <Label>Cart</Label>
       </NativeTabs.Trigger>
@@ -99,7 +132,7 @@ function ClassicTabLayout() {
         options={{
           title: "Cart",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "bag" : "bag-outline"} size={22} color={color} />
+            <TabCartIconWithBadge color={color} focused={focused} />
           ),
         }}
       />

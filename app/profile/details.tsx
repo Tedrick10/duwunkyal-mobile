@@ -41,6 +41,7 @@ export default function PersonalInfoDetailsScreen() {
     { label: "Full Name", value: user.name, icon: "person-outline" as const },
     { label: "Phone", value: user.phone || "—", icon: "call-outline" as const },
     { label: "Email", value: user.email || "—", icon: "mail-outline" as const },
+    { label: "Address", value: user.address || "—", icon: "location-outline" as const },
   ];
 
   return (

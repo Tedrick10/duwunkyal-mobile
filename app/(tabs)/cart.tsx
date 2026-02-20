@@ -57,10 +57,14 @@ export default function CartScreen() {
     : 0;
 
   function handleQuantity(item: any, delta: number) {
-    const newQty = item.quantity + delta;
+    let newQty = item.quantity + delta;
     if (newQty <= 0) {
       handleRemove(item.id);
       return;
+    }
+    const stock = item.product?.stock;
+    if (stock != null && typeof stock === "number") {
+      newQty = Math.min(newQty, stock);
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     updateMutation.mutate({ id: item.id, quantity: newQty });

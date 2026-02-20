@@ -30,6 +30,7 @@ export default function EditProfileScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -43,6 +44,7 @@ export default function EditProfileScreen() {
       setName(user.name || "");
       setPhone(user.phone || "");
       setEmail(user.email || "");
+      setAddress(user.address || "");
     }
   }, [user]);
 
@@ -97,6 +99,7 @@ export default function EditProfileScreen() {
         name: name.trim(),
         phone: phone.trim(),
         email: email.trim() || undefined,
+        address: address.trim() || undefined,
         photoUri: photoUri ?? undefined,
         ...(password ? { password, password_confirmation: passwordConfirmation } : {}),
       });
@@ -201,7 +204,7 @@ export default function EditProfileScreen() {
                 keyboardType="phone-pad"
               />
             </View>
-            <View style={[styles.inputRow, styles.inputRowLast, { borderColor: C.borderLight }]}>
+            <View style={[styles.inputRow, { borderColor: C.borderLight }]}>
               <Ionicons name="mail-outline" size={20} color={C.accent} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { color: C.text }]}
@@ -212,6 +215,17 @@ export default function EditProfileScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+              />
+            </View>
+            <View style={[styles.inputRow, styles.inputRowLast, { borderColor: C.borderLight }]}>
+              <Ionicons name="location-outline" size={20} color={C.accent} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { color: C.text, minHeight: 44 }]}
+                placeholder="Address (optional)"
+                placeholderTextColor={C.textLight}
+                value={address}
+                onChangeText={setAddress}
+                multiline
               />
             </View>
           </View>

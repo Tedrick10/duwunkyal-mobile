@@ -28,6 +28,7 @@ import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { formatPriceMMK } from "@/lib/format";
+import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { type CategoryItem, type ProductListItem } from "@/lib/query-client";
 import { apiMobileUrl } from "@/lib/api-config";
 
@@ -264,7 +265,9 @@ export default function HomeScreen() {
                   <Image source={{ uri: product.image_url }} style={styles.featuredImage} resizeMode="contain" />
                 </View>
                 <Text style={[styles.featuredName, { color: C.text }]} numberOfLines={1}>{product.name}</Text>
-                <Text style={styles.featuredPrice}>{formatPriceMMK(product.sale_price ?? product.price)}</Text>
+                <View style={styles.featuredPrice}>
+                  <ProductPriceDisplay price={product.price} salePrice={product.sale_price} />
+                </View>
               </Pressable>
             ))}
           </ScrollView>
@@ -288,7 +291,7 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.productInfo}>
                   <Text style={[styles.productName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
-                  <Text style={styles.productPrice}>{formatPriceMMK(product.sale_price ?? product.price)}</Text>
+                  <ProductPriceDisplay price={product.price} salePrice={product.sale_price} />
                 </View>
               </Pressable>
             ))}

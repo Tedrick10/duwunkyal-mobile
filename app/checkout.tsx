@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TextInput,
   Pressable,
   ActivityIndicator,
@@ -15,9 +14,10 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import Colors from "@/constants/colors";
+import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-client";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { formatPriceMMK } from "@/lib/format";
 
 export default function CheckoutScreen() {
@@ -26,6 +26,7 @@ export default function CheckoutScreen() {
   const [shippingName, setShippingName] = useState(user?.name ?? "");
   const [shippingPhone, setShippingPhone] = useState(user?.phone ?? "");
   const [shippingAddress, setShippingAddress] = useState(user?.address ?? "");
+  const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function CheckoutScreen() {
         shippingAddress: shippingAddress.trim(),
         shippingName: shippingName.trim() || undefined,
         shippingPhone: shippingPhone.trim() || undefined,
+        notes: notes.trim() || undefined,
       });
       if (!res.ok) throw new Error("Place order failed");
       return (await res.json()) as { id: number; number?: string; total?: string };
@@ -94,15 +96,19 @@ export default function CheckoutScreen() {
     orderMutation.mutate();
   }
 
+  const bottomPadding = insets.bottom + (Platform.OS === "web" ? 34 : 0) + 24;
+
   return (
-    <ScrollView
+    <KeyboardAwareScrollViewCompat
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 40 }}
-      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ paddingBottom: bottomPadding }}
+      showsVerticalScrollIndicator={true}
+      keyboardDismissMode="on-drag"
+      bottomOffset={20}
     >
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Order Summary</Text>
-        <View style={styles.summaryList}>
+        <View style={styles.summaryCardWrap}>
           {cartItems?.map((item) => {
             const isCustom = item.customization != null;
             const price = parseFloat(item.customPrice ?? item.product?.price ?? "0") * item.quantity;
@@ -159,40 +165,64 @@ export default function CheckoutScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Shipping Details</Text>
-        {!!error && (
-          <View style={styles.errorBox}>
-            <Ionicons name="alert-circle" size={16} color={Colors.error} />
-            <Text style={styles.errorText}>{error}</Text>
+        <View style={styles.formCard}>
+          {!!error && (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle" size={16} color={Colors.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+          <View style={styles.inputGroup}>
+            <Ionicons name="person-outline" size={18} color={Colors.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={[styles.input, styles.inputWithIcon]}
+              placeholder="Full name *"
+              placeholderTextColor={Colors.textLight}
+              value={shippingName}
+              onChangeText={setShippingName}
+            />
           </View>
-        )}
-        <TextInput
-          style={styles.input}
-          placeholder="Full name *"
-          placeholderTextColor={Colors.textLight}
-          value={shippingName}
-          onChangeText={setShippingName}
-        />
-        <TextInput
-          style={[styles.input, { marginTop: 10 }]}
-          placeholder="Phone number *"
-          placeholderTextColor={Colors.textLight}
-          value={shippingPhone}
-          onChangeText={setShippingPhone}
-          keyboardType="phone-pad"
-        />
-        <TextInput
-          style={[styles.input, styles.addressInput, { marginTop: 10 }]}
-          placeholder="Full shipping address *"
-          placeholderTextColor={Colors.textLight}
-          value={shippingAddress}
-          onChangeText={setShippingAddress}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-        />
+          <View style={[styles.inputGroup, styles.inputSpacing]}>
+            <Ionicons name="call-outline" size={18} color={Colors.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={[styles.input, styles.inputWithIcon]}
+              placeholder="Phone number *"
+              placeholderTextColor={Colors.textLight}
+              value={shippingPhone}
+              onChangeText={setShippingPhone}
+              keyboardType="phone-pad"
+            />
+          </View>
+          <View style={[styles.inputGroup, styles.inputSpacing]}>
+            <Ionicons name="location-outline" size={18} color={Colors.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={[styles.input, styles.addressInput, styles.inputWithIcon]}
+              placeholder="Full shipping address *"
+              placeholderTextColor={Colors.textLight}
+              value={shippingAddress}
+              onChangeText={setShippingAddress}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+          </View>
+          <View style={[styles.inputGroup, styles.inputSpacing]}>
+            <Ionicons name="document-text-outline" size={18} color={Colors.textSecondary} style={styles.inputIcon} />
+            <TextInput
+              style={[styles.input, styles.notesInput, styles.inputWithIcon]}
+              placeholder="Order notes (optional)"
+              placeholderTextColor={Colors.textLight}
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              numberOfLines={2}
+              textAlignVertical="top"
+            />
+          </View>
+        </View>
       </View>
 
-      <View style={styles.section}>
+      <View style={[styles.section, styles.placeOrderSection]}>
         <Pressable
           style={({ pressed }) => [
             styles.placeOrderBtn,
@@ -212,29 +242,34 @@ export default function CheckoutScreen() {
           )}
         </Pressable>
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollViewCompat>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  section: { padding: 20, marginBottom: 4 },
+  section: { paddingHorizontal: 20, paddingTop: 16, marginBottom: 16 },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  summaryList: {},
+  summaryCardWrap: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...cardShadow,
+  },
   summaryCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.surfaceSecondary ?? "#f0f1f3",
     borderRadius: 12,
     padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   summaryImages: {
     flexDirection: "row",
@@ -278,7 +313,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: Colors.border,
-    marginVertical: 16,
+    marginVertical: 12,
   },
   totalRow: {
     flexDirection: "row",
@@ -309,25 +344,54 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_500Medium",
   },
-  input: {
+  formCard: {
     backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...cardShadow,
+  },
+  inputGroup: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  inputIcon: {
+    marginTop: 16,
+    marginRight: 10,
+  },
+  inputWithIcon: {
+    flex: 1,
+  },
+  input: {
+    backgroundColor: Colors.background,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: 14,
+    padding: 16,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: Colors.text,
   },
+  inputSpacing: {
+    marginTop: 12,
+  },
   addressInput: {
     minHeight: 80,
+    paddingTop: 14,
   },
+  notesInput: {
+    minHeight: 64,
+    paddingTop: 14,
+  },
+  placeOrderSection: { marginBottom: 0, paddingBottom: 8 },
   placeOrderBtn: {
     backgroundColor: Colors.accent,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     borderRadius: 12,
     gap: 8,
   },

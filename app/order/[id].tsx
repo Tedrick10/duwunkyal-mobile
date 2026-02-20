@@ -122,6 +122,13 @@ export default function OrderDetailScreen() {
         );
       })()}
 
+      {order.notes && order.notes.trim() && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Order notes</Text>
+          <Text style={styles.notesText}>{order.notes}</Text>
+        </View>
+      )}
+
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Items</Text>
         {order.items?.map((item: any) => {
@@ -226,6 +233,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   addressText: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  notesText: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,

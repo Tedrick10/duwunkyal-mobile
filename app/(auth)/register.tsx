@@ -27,6 +27,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -76,6 +77,7 @@ export default function RegisterScreen() {
         passwordConfirmation,
         name.trim(),
         email.trim() || undefined,
+        address.trim() || undefined,
         photoUri ?? undefined
       );
       router.dismissAll();
@@ -168,6 +170,21 @@ export default function RegisterScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Address (optional)</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="location-outline" size={20} color={Colors.textLight} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { minHeight: 44 }]}
+                placeholder="Your address"
+                placeholderTextColor={Colors.textLight}
+                value={address}
+                onChangeText={setAddress}
+                multiline
               />
             </View>
           </View>

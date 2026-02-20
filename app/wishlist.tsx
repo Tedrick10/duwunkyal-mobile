@@ -16,6 +16,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-client";
 import { formatPriceMMK } from "@/lib/format";
+import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 
 export default function WishlistScreen() {
   const { user } = useAuth();
@@ -80,9 +81,7 @@ export default function WishlistScreen() {
           <Text style={styles.itemName} numberOfLines={2}>
             {item.product.name}
           </Text>
-          <Text style={styles.itemPrice}>
-            {formatPriceMMK(item.product.price)}
-          </Text>
+          <ProductPriceDisplay price={item.product.price} salePrice={item.product.sale_price} />
         </View>
         <Pressable
           style={styles.removeBtn}
