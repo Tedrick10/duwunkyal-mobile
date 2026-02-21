@@ -31,6 +31,7 @@ import { formatPriceMMK } from "@/lib/format";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { type CategoryItem, type ProductListItem } from "@/lib/query-client";
 import { apiMobileUrl } from "@/lib/api-config";
+import { NotificationIconWithBadge } from "@/components/NotificationIconWithBadge";
 
 export type BannerItem = { id: number; image_url: string };
 
@@ -181,13 +182,14 @@ export default function HomeScreen() {
           style={[styles.notifBtn, { backgroundColor: C.surface, borderColor: C.border }]}
           onPress={() => {
             if (!user) router.push("/(auth)/login");
+            else router.push("/notifications");
           }}
         >
-          <Ionicons
-            name={user ? "notifications-outline" : "person-outline"}
-            size={22}
-            color={C.text}
-          />
+          {user ? (
+            <NotificationIconWithBadge color={C.text} />
+          ) : (
+            <Ionicons name="person-outline" size={22} color={C.text} />
+          )}
         </Pressable>
       </View>
 

@@ -199,6 +199,8 @@ export default function CartScreen() {
               totalPrice: 0,
             }}
             productName={viewingDesignItem?.product?.name ?? "Product"}
+            frontImageUrl={viewingDesignItem?.product?.image}
+            backImageUrl={viewingDesignItem?.product?.imageBack}
           />
           <View style={[styles.bottomBar, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 80, backgroundColor: C.surface, borderTopColor: C.border }]}>
             <View style={styles.totalRow}>

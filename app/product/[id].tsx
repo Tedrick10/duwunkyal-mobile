@@ -209,8 +209,23 @@ export default function ProductDetailScreen() {
   if (!product) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.errorText}>Product not found</Text>
+        <View style={[styles.topBar, { top: insets.top + webTopInset }]}>
+          <Pressable
+            style={[styles.backBtn, { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border }]}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={22} color={Colors.text} />
+          </Pressable>
+        </View>
+        <View style={[styles.loadingContainer, { flex: 1, justifyContent: "center", gap: 16, paddingHorizontal: 24 }]}>
+          <Ionicons name="shirt-outline" size={48} color={Colors.textSecondary} />
+          <Text style={[styles.errorText, { textAlign: "center" }]}>Product not found</Text>
+          <Text style={[styles.loadingText, { fontSize: 14, textAlign: "center" }]}>
+            This product may have been removed or is no longer available.
+          </Text>
+          <Pressable style={[styles.addToCartBtn, { marginTop: 8 }]} onPress={() => router.back()}>
+            <Text style={styles.addToCartText}>Go Back</Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -239,22 +254,6 @@ export default function ProductDetailScreen() {
             style={styles.productImage}
             resizeMode="contain"
           />
-          <Pressable
-            style={styles.wishlistBtn}
-            onPress={() => {
-              if (!user) {
-                router.push("/(auth)/login");
-                return;
-              }
-              toggleWishlistMutation.mutate();
-            }}
-          >
-            <Ionicons
-              name={wishlisted ? "heart" : "heart-outline"}
-              size={22}
-              color={wishlisted ? Colors.accent : Colors.text}
-            />
-          </Pressable>
         </View>
 
         <View style={styles.infoSection}>
@@ -271,7 +270,7 @@ export default function ProductDetailScreen() {
                 }}
               >
                 <Text style={[styles.saleTypeChipText, saleType === "regular" && styles.saleTypeChipTextActive]}>
-                  Regular Sale
+                  Regular Sales
                 </Text>
               </Pressable>
               {canShowRentals && (
@@ -283,7 +282,7 @@ export default function ProductDetailScreen() {
                   }}
                 >
                   <Text style={[styles.saleTypeChipText, saleType === "rentals" && styles.saleTypeChipTextActive]}>
-                    Rentals
+                    Retails
                   </Text>
                 </Pressable>
               )}
@@ -296,7 +295,7 @@ export default function ProductDetailScreen() {
                   }}
                 >
                   <Text style={[styles.saleTypeChipText, saleType === "wholesale" && styles.saleTypeChipTextActive]}>
-                    Whole Sale
+                    Wholesale
                   </Text>
                 </Pressable>
               )}
@@ -306,9 +305,9 @@ export default function ProductDetailScreen() {
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>
               {saleType === "regular"
-                ? "Regular"
+                ? "Regular Sales"
                 : saleType === "rentals"
-                  ? "Rentals"
+                  ? "Retails"
                   : "Wholesale"}{" "}
               Price
             </Text>
@@ -471,30 +470,48 @@ export default function ProductDetailScreen() {
             )}
           </Text>
         </View>
-        <Pressable
-          style={({ pressed }) => [
-            styles.addToCartBtn,
-            pressed && { opacity: 0.9 },
-            addedToCart && styles.addedBtn,
-            product.stock <= 0 && styles.disabledBtn,
-          ]}
-          onPress={handleAddToCart}
-          disabled={product.stock <= 0 || addToCartMutation.isPending}
-        >
-          {addToCartMutation.isPending ? (
-            <ActivityIndicator color={Colors.white} size="small" />
-          ) : addedToCart ? (
-            <>
-              <Ionicons name="checkmark" size={20} color={Colors.white} />
-              <Text style={styles.addToCartText}>Added!</Text>
-            </>
-          ) : (
-            <>
-              <Ionicons name="bag-add-outline" size={20} color={Colors.white} />
-              <Text style={styles.addToCartText}>Add to Cart</Text>
-            </>
-          )}
-        </Pressable>
+        <View style={styles.bottomActions}>
+          <Pressable
+            style={({ pressed }) => [styles.wishlistIconBtn, pressed && { opacity: 0.8 }]}
+            onPress={() => {
+              if (!user) {
+                router.push("/(auth)/login");
+                return;
+              }
+              toggleWishlistMutation.mutate();
+            }}
+          >
+            <Ionicons
+              name={wishlisted ? "heart" : "heart-outline"}
+              size={24}
+              color={wishlisted ? Colors.accent : Colors.text}
+            />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.addToCartBtn,
+              pressed && { opacity: 0.9 },
+              addedToCart && styles.addedBtn,
+              product.stock <= 0 && styles.disabledBtn,
+            ]}
+            onPress={handleAddToCart}
+            disabled={product.stock <= 0 || addToCartMutation.isPending}
+          >
+            {addToCartMutation.isPending ? (
+              <ActivityIndicator color={Colors.white} size="small" />
+            ) : addedToCart ? (
+              <>
+                <Ionicons name="checkmark" size={20} color={Colors.white} />
+                <Text style={styles.addToCartText}>Added!</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="bag-add-outline" size={20} color={Colors.white} />
+                <Text style={styles.addToCartText}>Add to Cart</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
       </View>
 
       {showRequiredAlert && (
@@ -545,21 +562,20 @@ const styles = StyleSheet.create({
     paddingTop: 80,
     ...cardShadow,
   },
-  wishlistBtn: {
-    position: "absolute",
-    bottom: 16,
-    right: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  bottomActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  wishlistIconBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
   },
   productImage: {
     width: width * 0.7,

@@ -11,8 +11,10 @@ import {
 } from "react-native";
 import MaskedView from "@react-native-masked-view/masked-view";
 import ViewShot from "react-native-view-shot";
+import Svg, { Rect, Ellipse } from "react-native-svg";
 import { SvgXml } from "react-native-svg";
 import { tintSvgFills, ensureSvgFits } from "@/lib/tintSvgFills";
+import type { ProductCustomizationRegion } from "@/lib/query-client";
 import { DesignElement, DesignView, TshirtColorPart, CONTAINER_W, CONTAINER_H } from "./types";
 import { ColorBar } from "./ColorBar";
 import { Toolbar } from "./Toolbar";
@@ -61,6 +63,9 @@ type Props = {
   availableColors?: Array<{ hex: string; name?: string }>;
   /** When true, display front/back images as-is from backend (no mask/color overlay). Use for full product photos. */
   displayBaseImageAsPhoto?: boolean;
+  /** Template regions from API (body, collar, sleeve with rect/ellipse in 0–100%). When set, colors are applied per region. */
+  frontRegions?: Record<string, ProductCustomizationRegion>;
+  backRegions?: Record<string, ProductCustomizationRegion>;
 };
 
 export type DesignEditorRef = {
@@ -71,6 +76,13 @@ export type DesignEditorRef = {
 const DRAG_THRESHOLD = 5;
 const DEFAULT_TEXT_W = 120;
 const DEFAULT_TEXT_H = 40;
+
+/** Fallback regions when API provides none – Body, Collar, Sleeve work for typical shirt images. */
+const DEFAULT_FALLBACK_REGIONS: Record<string, ProductCustomizationRegion> = {
+  body: { type: "rect", x: 15, y: 15, width: 70, height: 70 },
+  collar: { type: "ellipse", cx: 50, cy: 20, rx: 25, ry: 8 },
+  sleeve: { type: "rect", x: 5, y: 25, width: 90, height: 50 },
+};
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -515,10 +527,23 @@ const DesignEditorInner = memo(function DesignEditorInner({
   readOnly = false,
   availableColors,
   displayBaseImageAsPhoto = false,
+  frontRegions,
+  backRegions,
   viewShotRef,
   captureShotRef,
 }: Props & { viewShotRef: React.RefObject<ViewShot | null>; captureShotRef: React.RefObject<ViewShot | null> }) {
-  const regionButtons: Array<{ id: string; label: string }> = [];
+  const currentRegions = view === "front" ? frontRegions : backRegions;
+  const hasTemplateRegions = currentRegions && Object.keys(currentRegions).length > 0;
+  const regionButtons: Array<{ id: string; label: string }> = hasTemplateRegions
+    ? Object.keys(currentRegions).map((key) => ({
+      id: key,
+      label: key === "body" ? "Body" : key === "collar" ? "Collar" : key === "sleeve" ? "Sleeve" : key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    }))
+    : [
+      { id: "body", label: "Body" },
+      { id: "sleeve", label: "Sleeve" },
+      { id: "collar", label: "Collar" },
+    ];
 
   // Defer expensive SVG tint so Front/Back and color taps feel instant
   const deferredView = useDeferredValue(view);
@@ -551,6 +576,13 @@ const DesignEditorInner = memo(function DesignEditorInner({
     () => (svgFitted ? tintSvgFills(svgFitted, deferredSleeveColor) : null),
     [svgFitted, deferredSleeveColor]
   );
+
+  const getColorForRegionKey = (regionKey: string): string => {
+    if (regionKey === "body") return deferredBodyColor;
+    if (regionKey === "collar") return deferredCollarColor;
+    if (regionKey === "sleeve" || regionKey === "sleeve_left" || regionKey === "sleeve_right") return deferredSleeveColor;
+    return deferredBodyColor;
+  };
 
   const renderRegion = (color: string, key: string, region: "collar" | "body" | "sleeve") => {
     const src = deferredSilhouetteSource;
@@ -647,7 +679,67 @@ const DesignEditorInner = memo(function DesignEditorInner({
         >
           <View style={[StyleSheet.absoluteFill, { width: CONTAINER_W, height: CONTAINER_H }]}>
             <View style={[StyleSheet.absoluteFill, { width: CONTAINER_W, height: CONTAINER_H }]} pointerEvents="none">
-              {renderRegion(deferredBodyColor, `shirt-${deferredView}`, "body")}
+              {displayBaseImageAsPhoto ? (
+                <Image
+                  source={deferredSilhouetteSource}
+                  style={[StyleSheet.absoluteFill, styles.tshirtBg]}
+                  resizeMode="contain"
+                />
+              ) : hasTemplateRegions ? (
+                <>
+                  <Image
+                    source={deferredSilhouetteSource}
+                    style={[StyleSheet.absoluteFill, styles.tshirtBg]}
+                    resizeMode="contain"
+                  />
+                  {Object.entries(currentRegions).map(([regionKey, region]) => {
+                    const color = getColorForRegionKey(regionKey);
+                    const w = CONTAINER_W;
+                    const h = CONTAINER_H;
+                    const isRect =
+                      region.type === "rect" &&
+                      typeof region.x === "number" &&
+                      (typeof region.width === "number" || typeof (region as any).w === "number");
+                    const isEllipse =
+                      region.type === "ellipse" ||
+                      (typeof region.cx === "number" && typeof region.rx === "number");
+                    if (!isRect && !isEllipse) return null;
+                    return (
+                      <MaskedView
+                        key={`region-${deferredView}-${regionKey}`}
+                        style={[StyleSheet.absoluteFill, styles.tshirtBg]}
+                        maskElement={
+                          <View style={[StyleSheet.absoluteFill, { width: w, height: h }]}>
+                            <Svg width={w} height={h} style={StyleSheet.absoluteFill}>
+                              {isRect ? (
+                                <Rect
+                                  x={((region.x ?? 0) / 100) * w}
+                                  y={((region.y ?? 0) / 100) * h}
+                                  width={((region.width ?? (region as any).w ?? 0) / 100) * w}
+                                  height={((region.height ?? (region as any).h ?? 0) / 100) * h}
+                                  fill="white"
+                                />
+                              ) : (
+                                <Ellipse
+                                  cx={((region.cx ?? 0) / 100) * w}
+                                  cy={((region.cy ?? 0) / 100) * h}
+                                  rx={((region.rx ?? 0) / 100) * w}
+                                  ry={((region.ry ?? 0) / 100) * h}
+                                  fill="white"
+                                />
+                              )}
+                            </Svg>
+                          </View>
+                        }
+                      >
+                        <View style={[StyleSheet.absoluteFill, styles.tshirtBg, { backgroundColor: color, opacity: 0.85 }]} />
+                      </MaskedView>
+                    );
+                  })}
+                </>
+              ) : (
+                renderRegion(deferredBodyColor, `shirt-${deferredView}`, "body")
+              )}
             </View>
             <View
               style={[styles.designLayer, { width: CONTAINER_W, height: CONTAINER_H }]}

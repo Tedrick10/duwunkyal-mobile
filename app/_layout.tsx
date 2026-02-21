@@ -1,3 +1,4 @@
+import "@/lib/firebase-messaging-background";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -8,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CustomSplashScreen } from "@/components/CustomSplashScreen";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider } from "@/lib/auth-context";
+import { NotificationSetup } from "@/components/NotificationSetup";
 import { ThemeProvider } from "@/lib/theme-context";
 import {
   useFonts,
@@ -36,6 +38,10 @@ function RootLayoutNav() {
         options={{ title: "Checkout", headerBackTitle: "Cart" }}
       />
       <Stack.Screen
+        name="order-success"
+        options={{ title: "Order Success", headerBackTitle: "Back" }}
+      />
+      <Stack.Screen
         name="order/[id]"
         options={{ title: "Order Details", headerBackTitle: "Back" }}
       />
@@ -62,6 +68,14 @@ function RootLayoutNav() {
       <Stack.Screen
         name="customize/[id]"
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="notifications"
+        options={{ title: "Notifications", headerBackTitle: "Home" }}
+      />
+      <Stack.Screen
+        name="notification-detail"
+        options={{ title: "Notification", headerBackTitle: "Back" }}
       />
     </Stack>
   );
@@ -93,6 +107,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
+          <NotificationSetup />
           <ThemeProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
               <KeyboardProvider>

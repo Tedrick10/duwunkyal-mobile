@@ -44,6 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await queryClient.removeQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith?.("/api/wishlist/check") });
       await queryClient.removeQueries({ queryKey: ["/api/cart"] });
       await queryClient.removeQueries({ predicate: (q) => (q.queryKey[0] as string) === "/api/orders" });
+      await queryClient.removeQueries({ queryKey: ["/api/notifications"] });
+      await queryClient.removeQueries({ queryKey: ["/api/notifications/unread-count"] });
     });
     return () => setOnUnauthorized(() => { });
   }, []);
@@ -116,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await queryClient.removeQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith?.("/api/wishlist/check") });
     await queryClient.removeQueries({ queryKey: ["/api/cart"] });
     await queryClient.removeQueries({ predicate: (q) => (q.queryKey[0] as string) === "/api/orders" });
+    await queryClient.removeQueries({ queryKey: ["/api/notifications"] });
+    await queryClient.removeQueries({ queryKey: ["/api/notifications/unread-count"] });
     await queryClient.invalidateQueries({ queryKey: ["productList"] });
     await queryClient.invalidateQueries({ queryKey: ["featuredProductList"] });
     await queryClient.invalidateQueries({ predicate: (q) => (q.queryKey[0] as string)?.startsWith?.("productListByCategory/") });

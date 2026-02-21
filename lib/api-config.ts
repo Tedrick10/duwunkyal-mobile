@@ -43,3 +43,34 @@ export function apiMobileUrl(endpoint: string): string {
   const p = endpoint.startsWith("/") ? endpoint.slice(1) : endpoint;
   return `${base}/${p}`;
 }
+
+/**
+ * Resolve notification image URL so it's reachable from the mobile device.
+ * - Replaces localhost/127.0.0.1 with the API base URL (e.g. LAN IP)
+ * - Converts relative paths (storage/...) to full URLs using API base
+ */
+export function resolveNotificationImageUrl(url: string | undefined | null): string {
+  if (!url || typeof url !== "string") return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  try {
+    const base = API_BASE_URL.replace(/\/$/, "");
+    if (
+      trimmed.startsWith("http://localhost") ||
+      trimmed.startsWith("https://localhost") ||
+      trimmed.startsWith("http://127.0.0.1") ||
+      trimmed.startsWith("https://127.0.0.1")
+    ) {
+      const pathMatch = trimmed.match(/^(https?:\/\/[^/]+)(\/.*)$/);
+      const path = pathMatch ? pathMatch[2] : trimmed;
+      return `${base}${path.startsWith("/") ? path : "/" + path}`;
+    }
+    if (trimmed.startsWith("storage/") || trimmed.startsWith("/storage/")) {
+      const path = trimmed.startsWith("/") ? trimmed : "/" + trimmed;
+      return `${base}${path}`;
+    }
+    return trimmed;
+  } catch {
+    return trimmed;
+  }
+}

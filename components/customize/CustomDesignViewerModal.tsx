@@ -6,9 +6,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { CustomizationData, DesignElement } from "./types";
+import { getProductImageSource } from "@/lib/query-client";
 import { CONTAINER_W, CONTAINER_H } from "./types";
 import { DesignEditor } from "./DesignEditor";
 import { formatPriceMMK } from "@/lib/format";
@@ -23,6 +25,9 @@ type Props = {
   onClose: () => void;
   customization: CustomizationData;
   productName: string;
+  /** Captured front/back images from CustomizeScreen – when present, show these instead of default SVG */
+  frontImageUrl?: string | null;
+  backImageUrl?: string | null;
 };
 
 function elementSummary(el: DesignElement): string {
@@ -41,6 +46,8 @@ export function CustomDesignViewerModal({
   onClose,
   customization,
   productName,
+  frontImageUrl,
+  backImageUrl,
 }: Props) {
   const [view, setView] = useState<"front" | "back">("front");
   const frontDesign = Array.isArray(customization?.frontDesign) ? customization.frontDesign : [];
@@ -113,32 +120,40 @@ export function CustomDesignViewerModal({
 
             <View style={styles.previewWrap}>
               <View style={styles.canvasWrap} collapsable={false}>
-                <DesignEditor
-                  view={view}
-                  bodyColor={safeCustomization.bodyColor}
-                  sleeveColor={safeCustomization.sleeveColor}
-                  collarColor={safeCustomization.collarColor}
-                  colorPart="body"
-                  onColorPartChange={() => { }}
-                  elements={elements}
-                  selectedId={null}
-                  textModalVisible={false}
-                  frontImage={frontImage}
-                  backImage={backImage}
-                  frontSvg={TSHIRT_FRONT_SVG}
-                  backSvg={TSHIRT_BACK_SVG}
-                  onViewChange={(v) => setView(v)}
-                  onColorChange={() => { }}
-                  onAddText={() => { }}
-                  onCliparts={() => { }}
-                  onTemplate={() => { }}
-                  onAddImage={() => { }}
-                  onTextModalClose={() => { }}
-                  onTextModalAdd={() => { }}
-                  onSelectElement={() => { }}
-                  onDeleteSelected={() => { }}
-                  readOnly
-                />
+                {frontImageUrl && backImageUrl ? (
+                  <Image
+                    source={getProductImageSource(view === "front" ? frontImageUrl : backImageUrl)}
+                    style={styles.capturedImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <DesignEditor
+                    view={view}
+                    bodyColor={safeCustomization.bodyColor}
+                    sleeveColor={safeCustomization.sleeveColor}
+                    collarColor={safeCustomization.collarColor}
+                    colorPart="body"
+                    onColorPartChange={() => { }}
+                    elements={elements}
+                    selectedId={null}
+                    textModalVisible={false}
+                    frontImage={frontImage}
+                    backImage={backImage}
+                    frontSvg={TSHIRT_FRONT_SVG}
+                    backSvg={TSHIRT_BACK_SVG}
+                    onViewChange={(v) => setView(v)}
+                    onColorChange={() => { }}
+                    onAddText={() => { }}
+                    onCliparts={() => { }}
+                    onTemplate={() => { }}
+                    onAddImage={() => { }}
+                    onTextModalClose={() => { }}
+                    onTextModalAdd={() => { }}
+                    onSelectElement={() => { }}
+                    onDeleteSelected={() => { }}
+                    readOnly
+                  />
+                )}
               </View>
               {elements.length > 0 && (
                 <View style={styles.elementsList}>
@@ -268,6 +283,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#c7c5c5",
     borderRadius: 12,
     overflow: "hidden",
+  },
+  capturedImage: {
+    width: "100%",
+    height: "100%",
   },
   elementsList: {
     marginTop: 12,

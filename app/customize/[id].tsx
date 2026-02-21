@@ -35,6 +35,10 @@ function generateId() {
   return `el-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function hasRegions(r: Record<string, unknown> | null | undefined): boolean {
+  return !!(r && typeof r === "object" && Object.keys(r).length > 0);
+}
+
 export default function CustomizeScreen() {
   const { id, image, imageBack } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
@@ -95,9 +99,10 @@ export default function CustomizeScreen() {
 
       let frontImageUrl: string | null = baseImage;
       let backImageUrl: string | null = baseImageBack;
+      let hasCustomPreview = false;
 
-      const hasCustomDesign = frontDesign.length > 0 || backDesign.length > 0;
-      if (hasCustomDesign && designEditorRef.current) {
+      // Always capture from DesignEditor so cart shows same shirt (colors + designs) as CustomizeScreen
+      if (designEditorRef.current) {
         const prevView = view;
         const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -118,6 +123,7 @@ export default function CustomizeScreen() {
             const url = await uploadDesignImage(backPath);
             backImageUrl = url;
           }
+          hasCustomPreview = !!(frontImageUrl && backImageUrl);
         } catch (_) {
           setView(prevView);
         }
@@ -143,6 +149,7 @@ export default function CustomizeScreen() {
           frontDesign,
           backDesign,
           totalPrice: finalTotal,
+          hasCustomPreview,
         },
         customPrice: String(finalTotal),
         productOverride,
@@ -170,6 +177,22 @@ export default function CustomizeScreen() {
     queryKey: ["productCustomization", id],
     enabled: !!id,
   });
+
+  const needsFrontRegions = !!(customization?.front_view?.image_url && !hasRegions(customization?.front_view?.regions));
+  const needsBackRegions = !!(customization?.back_view?.image_url && !hasRegions(customization?.back_view?.regions));
+  const shouldDetectRegions = !!(id && (needsFrontRegions || needsBackRegions));
+
+  const { data: detectRegionsData } = useQuery<{
+    front_regions: Record<string, import("@/lib/query-client").ProductCustomizationRegion> | null;
+    back_regions: Record<string, import("@/lib/query-client").ProductCustomizationRegion> | null;
+    api_unavailable: boolean;
+  }>({
+    queryKey: ["productDetectRegions", id],
+    enabled: shouldDetectRegions,
+  });
+
+  const frontRegions = customization?.front_view?.regions ?? detectRegionsData?.front_regions ?? undefined;
+  const backRegions = customization?.back_view?.regions ?? detectRegionsData?.back_regions ?? undefined;
 
   const customizeLoginRequired = !!id && customizationError && (customizationErr as any)?.loginRequired === true;
   const basePrice =
@@ -503,7 +526,7 @@ export default function CustomizeScreen() {
   const handleColorChange = useCallback((color: string) => {
     startTransition(() => {
       if (colorPart === "body") setTshirtBodyColor(color);
-      else if (colorPart === "sleeves" || colorPart === "sleeve") setTshirtSleeveColor(color);
+      else if (colorPart === "sleeves" || colorPart === "sleeve" || colorPart === "sleeve_left" || colorPart === "sleeve_right") setTshirtSleeveColor(color);
       else setTshirtCollarColor(color);
     });
   }, [colorPart]);
@@ -692,6 +715,8 @@ export default function CustomizeScreen() {
           onDragStart={pushUndo}
           availableColors={customization?.colors?.map((c) => ({ hex: c.hex, name: c.name }))}
           displayBaseImageAsPhoto={!!(frontImageSrc || backImageSrc) && !(customization?.colors?.length)}
+          frontRegions={frontRegions}
+          backRegions={backRegions}
         />
         <TouchableOpacity
           style={styles.preview3DWidget}

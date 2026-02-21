@@ -137,6 +137,7 @@ export type ProductCustomizationRegion = {
   cx?: number;
   cy?: number;
   rx?: number;
+  ry?: number;
   name?: string;
 };
 
@@ -710,8 +711,65 @@ export const getQueryFn: <T>(options: {
         return { inWishlist } as any;
       }
 
+      if (route === "/api/notifications") {
+        const token = await LocalDataService.getStoredToken();
+        if (!token) return { notifications: [] } as any;
+        const res = await apiMobileRequest("GET", "notifications", undefined, token);
+        if (!res.ok) {
+          if (res.status === 401) {
+            if (unauthorizedBehavior === "throw") throw new Error("Unauthorized");
+            return { notifications: [] } as any;
+          }
+          throw new Error("Notifications fetch failed");
+        }
+        return (await res.json()) as { notifications: any[] };
+      }
+
+      if (route === "/api/notifications/unread-count") {
+        const token = await LocalDataService.getStoredToken();
+        if (!token) return { count: 0 } as any;
+        const res = await apiMobileRequest("GET", "notifications/unread-count", undefined, token);
+        if (!res.ok) {
+          if (res.status === 401) {
+            if (unauthorizedBehavior === "throw") throw new Error("Unauthorized");
+            return { count: 0 } as any;
+          }
+          throw new Error("Unread count failed");
+        }
+        return (await res.json()) as { count: number };
+      }
+
       return null as any;
     };
+
+/** Mark a notification as read. Call from authenticated context. */
+export async function markNotificationRead(id: number): Promise<void> {
+  const token = await LocalDataService.getStoredToken();
+  if (!token) return;
+  const res = await fetch(apiMobileUrl(`notifications/${id}/read`), {
+    method: "PATCH",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) throw new Error("Mark read failed");
+}
+
+/** Delete a notification. Call from authenticated context. */
+export async function deleteNotification(id: number): Promise<void> {
+  const token = await LocalDataService.getStoredToken();
+  if (!token) return;
+  const res = await fetch(apiMobileUrl(`notifications/${id}`), {
+    method: "DELETE",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) throw new Error("Delete failed");
+}
 
 export function getImageUrl(path: string | null | undefined): string {
   if (!path) return "";

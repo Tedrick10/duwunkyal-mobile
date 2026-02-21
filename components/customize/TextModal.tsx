@@ -344,7 +344,7 @@ export function TextModal({ visible, onClose, onAdd }: Props) {
                     },
                   ]}
                 />
-              </View>
+            </View>
 
               {/* HEX input with copy */}
               <View style={styles.hexRow}>
@@ -353,7 +353,7 @@ export function TextModal({ visible, onClose, onAdd }: Props) {
                   <Text style={styles.hexInput} numberOfLines={1}>{hexValue}</Text>
                   <TouchableOpacity style={styles.hexCopyBtn} onPress={handleCopyHex}>
                     <Text style={styles.hexCopyText}>Copy</Text>
-                  </TouchableOpacity>
+              </TouchableOpacity>
                 </View>
               </View>
             </View>

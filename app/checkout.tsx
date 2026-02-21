@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import { showOrderPlacedNotification } from "@/lib/show-order-notification";
 import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-client";
@@ -61,10 +62,11 @@ export default function CheckoutScreen() {
       if (!res.ok) throw new Error("Place order failed");
       return (await res.json()) as { id: number; number?: string; total?: string };
     },
-    onSuccess: (order) => {
+    onSuccess: async (order) => {
       queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await showOrderPlacedNotification(order);
       router.replace({
         pathname: "/order-success",
         params: {

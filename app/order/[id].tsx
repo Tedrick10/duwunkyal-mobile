@@ -20,6 +20,7 @@ export default function OrderDetailScreen() {
 
   const { data: order, isLoading } = useQuery<any>({
     queryKey: ["/api/orders", id],
+    refetchOnMount: "always",
   });
 
   function getStatusColor(status: string): string {
