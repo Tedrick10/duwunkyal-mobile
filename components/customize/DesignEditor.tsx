@@ -22,11 +22,15 @@ import { TextModal } from "./TextModal";
 
 // When frontSvg/backSvg are provided, use SVG with tinted fills (natural shading). Otherwise Image + MaskedView/tintColor.
 
+/** Segment label from Clothing Segments API (id, name, defaultHex). */
+export type SegmentLabelItem = { id: number; name: string; defaultHex?: string };
+
 type Props = {
   view: DesignView;
   bodyColor: string;
   sleeveColor: string;
   collarColor: string;
+  cuffColor?: string;
   colorPart: string;
   onColorPartChange: (part: string) => void;
   elements: DesignElement[];
@@ -63,9 +67,12 @@ type Props = {
   availableColors?: Array<{ hex: string; name?: string }>;
   /** When true, display front/back images as-is from backend (no mask/color overlay). Use for full product photos. */
   displayBaseImageAsPhoto?: boolean;
-  /** Template regions from API (body, collar, sleeve with rect/ellipse in 0–100%). When set, colors are applied per region. */
+  /** Template regions from API (body, collar, sleeve, cuff with rect/ellipse in 0–100%). When set, colors are applied per region. */
   frontRegions?: Record<string, ProductCustomizationRegion>;
   backRegions?: Record<string, ProductCustomizationRegion>;
+  /** Segment labels from Clothing Segments API (for display names e.g. Cuff → Cut Off). */
+  frontSegmentLabels?: SegmentLabelItem[] | null;
+  backSegmentLabels?: SegmentLabelItem[] | null;
 };
 
 export type DesignEditorRef = {
@@ -77,12 +84,24 @@ const DRAG_THRESHOLD = 5;
 const DEFAULT_TEXT_W = 120;
 const DEFAULT_TEXT_H = 40;
 
-/** Fallback regions when API provides none – Body, Collar, Sleeve work for typical shirt images. */
+/** Fallback regions when API provides none – Body, Collar, Sleeve, Cuff (Cut Off) for typical shirt images. */
 const DEFAULT_FALLBACK_REGIONS: Record<string, ProductCustomizationRegion> = {
   body: { type: "rect", x: 15, y: 15, width: 70, height: 70 },
   collar: { type: "ellipse", cx: 50, cy: 20, rx: 25, ry: 8 },
   sleeve: { type: "rect", x: 5, y: 25, width: 90, height: 50 },
+  cuff: { type: "rect", x: 5, y: 70, width: 90, height: 12 },
 };
+
+/** Display label for region key (e.g. cuff → Cut Off). */
+function getRegionLabel(key: string, segmentLabels?: SegmentLabelItem[] | null): string {
+  if (key === "body") return "Body";
+  if (key === "collar") return "Collar";
+  if (key === "sleeve" || key === "sleeve_left" || key === "sleeve_right") return "Sleeve";
+  if (key === "cuff" || key === "cut_off") return "Cut Off";
+  const seg = segmentLabels?.find((s) => s.name.toLowerCase() === key.replace(/_/g, " "));
+  if (seg) return seg.name;
+  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -502,6 +521,7 @@ const DesignEditorInner = memo(function DesignEditorInner({
   bodyColor,
   sleeveColor,
   collarColor,
+  cuffColor = "#ffffff",
   colorPart,
   onColorPartChange,
   elements,
@@ -529,20 +549,24 @@ const DesignEditorInner = memo(function DesignEditorInner({
   displayBaseImageAsPhoto = false,
   frontRegions,
   backRegions,
+  frontSegmentLabels,
+  backSegmentLabels,
   viewShotRef,
   captureShotRef,
 }: Props & { viewShotRef: React.RefObject<ViewShot | null>; captureShotRef: React.RefObject<ViewShot | null> }) {
   const currentRegions = view === "front" ? frontRegions : backRegions;
+  const currentSegmentLabels = view === "front" ? frontSegmentLabels : backSegmentLabels;
   const hasTemplateRegions = currentRegions && Object.keys(currentRegions).length > 0;
   const regionButtons: Array<{ id: string; label: string }> = hasTemplateRegions
     ? Object.keys(currentRegions).map((key) => ({
       id: key,
-      label: key === "body" ? "Body" : key === "collar" ? "Collar" : key === "sleeve" ? "Sleeve" : key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      label: getRegionLabel(key, currentSegmentLabels),
     }))
     : [
       { id: "body", label: "Body" },
       { id: "sleeve", label: "Sleeve" },
       { id: "collar", label: "Collar" },
+      { id: "cuff", label: "Cut Off" },
     ];
 
   // Defer expensive SVG tint so Front/Back and color taps feel instant
@@ -550,6 +574,7 @@ const DesignEditorInner = memo(function DesignEditorInner({
   const deferredBodyColor = useDeferredValue(bodyColor);
   const deferredSleeveColor = useDeferredValue(sleeveColor);
   const deferredCollarColor = useDeferredValue(collarColor);
+  const deferredCuffColor = useDeferredValue(cuffColor);
 
   const deferredSilhouetteSource = deferredView === "front" ? frontImage : backImage;
   const deferredSvgSource = deferredView === "front" ? frontSvg : backSvg;
@@ -558,7 +583,9 @@ const DesignEditorInner = memo(function DesignEditorInner({
       ? bodyColor
       : colorPart === "sleeves" || colorPart === "sleeve" || colorPart === "sleeve_left" || colorPart === "sleeve_right"
         ? sleeveColor
-        : collarColor;
+        : colorPart === "cuff" || colorPart === "cut_off"
+          ? cuffColor
+          : collarColor;
 
   const svgFitted = useMemo(
     () => (deferredSvgSource ? ensureSvgFits(deferredSvgSource) : null),
@@ -581,6 +608,7 @@ const DesignEditorInner = memo(function DesignEditorInner({
     if (regionKey === "body") return deferredBodyColor;
     if (regionKey === "collar") return deferredCollarColor;
     if (regionKey === "sleeve" || regionKey === "sleeve_left" || regionKey === "sleeve_right") return deferredSleeveColor;
+    if (regionKey === "cuff" || regionKey === "cut_off") return deferredCuffColor;
     return deferredBodyColor;
   };
 

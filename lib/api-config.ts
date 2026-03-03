@@ -1,13 +1,17 @@
 /**
- * API Base URL – Set EXPO_PUBLIC_API_BASE_URL in .env or change default below.
- * Optional: EXPO_PUBLIC_API_PREFIX (e.g. "api") for paths like /api/mobile/customerLogin.
+ * API Base URL – Set EXPO_PUBLIC_API_BASE_URL in .env (see .env.example).
+ *
+ * Postman works because it runs on your computer. Mobile runs on phone/simulator:
+ * - iOS Simulator / Android Emulator: use http://127.0.0.1:8000 (same machine)
+ * - Physical device (real phone): use your computer's LAN IP, e.g. http://192.168.1.2:8000
+ *   and run backend with: php artisan serve --host=0.0.0.0
  */
 const envBase = process.env.EXPO_PUBLIC_API_BASE_URL;
 const envDomain = process.env.EXPO_PUBLIC_DOMAIN;
 
 function fromDomain(): string {
   if (!envDomain || envDomain === "undefined" || envDomain === "null") {
-    // return "http://localhost";
+    // Default: LAN IP so physical device can reach backend. For simulator only, use http://127.0.0.1:8000
     return "http://192.168.1.2:8000";
   }
   const protocol =
