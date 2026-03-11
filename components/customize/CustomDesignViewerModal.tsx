@@ -10,24 +10,36 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { CustomizationData, DesignElement } from "./types";
-import { getProductImageSource } from "@/lib/query-client";
+import { getProductImageSource, getImageUrl, type ProductCustomizationRegion } from "@/lib/query-client";
 import { CONTAINER_W, CONTAINER_H } from "./types";
 import { DesignEditor } from "./DesignEditor";
 import { formatPriceMMK } from "@/lib/format";
 import { TSHIRT_FRONT_SVG } from "@/lib/tshirt-front-svg";
 import { TSHIRT_BACK_SVG } from "@/lib/tshirt-back-svg";
 
-const frontImage = require("@/assets/products/tshirt-front.png");
-const backImage = require("@/assets/products/tshirt-back.png");
+const defaultFrontImage = require("@/assets/products/tshirt-front.png");
+const defaultBackImage = require("@/assets/products/tshirt-back.png");
+
+type ProductCustomizationView = {
+  image_url: string;
+  regions: Record<string, { type?: string; x?: number; y?: number; width?: number; height?: number; cx?: number; cy?: number; rx?: number; ry?: number }>;
+  region_masks?: Record<string, string> | null;
+};
 
 type Props = {
   visible: boolean;
   onClose: () => void;
   customization: CustomizationData;
   productName: string;
-  /** Captured front/back images from CustomizeScreen – when present, show these instead of default SVG */
+  /** Captured front/back images – only use when hasCustomPreview is true (real captured preview) */
   frontImageUrl?: string | null;
   backImageUrl?: string | null;
+  /** True when front/back are captured custom previews, not default product images */
+  hasCustomPreview?: boolean;
+  /** Product customization from API – for regions, masks, template images */
+  productCustomization?: { front_view: ProductCustomizationView; back_view: ProductCustomizationView; neck_style?: string | null } | null;
+  /** Cart item custom price – fallback when customization.totalPrice is 0 */
+  customPrice?: string | number | null;
 };
 
 function elementSummary(el: DesignElement): string {
@@ -41,6 +53,37 @@ function elementSummary(el: DesignElement): string {
   return "Element";
 }
 
+/** Normalize customization from API (handles both camelCase and snake_case). */
+function normalizeCustomization(c: CustomizationData | Record<string, unknown> | null | undefined) {
+  if (!c || typeof c !== "object") return null;
+  const raw = c as Record<string, unknown>;
+  const get = (...keys: string[]) => keys.reduce<unknown>((v, k) => v ?? raw[k], undefined);
+  const toHex = (v: unknown): string | undefined => {
+    const s = String(v ?? "").trim();
+    if (!s) return undefined;
+    return s.startsWith("#") ? s : `#${s.replace(/^#/, "")}`;
+  };
+  const bodyColor = toHex(get("bodyColor", "body_color")) ?? "#ffffff";
+  const sleeveColor = toHex(get("sleeveColor", "sleeve_color")) ?? bodyColor;
+  const collarColor = toHex(get("collarColor", "collar_color")) ?? bodyColor;
+  const cuffColor = toHex(get("cuffColor", "cuff_color")) ?? bodyColor;
+  const frontDesign = Array.isArray(get("frontDesign", "front_design")) ? (get("frontDesign", "front_design") as DesignElement[]) : [];
+  const backDesign = Array.isArray(get("backDesign", "back_design")) ? (get("backDesign", "back_design") as DesignElement[]) : [];
+  const tp = get("totalPrice", "total_price", "designTotal", "design_total");
+  const totalPrice = typeof tp === "number" ? tp : (typeof tp === "string" ? parseFloat(tp) || 0 : 0);
+  const neck_style = get("neck_style", "neck_style") ?? undefined;
+  return {
+    bodyColor,
+    sleeveColor,
+    collarColor,
+    cuffColor,
+    neck_style,
+    frontDesign,
+    backDesign,
+    totalPrice,
+  };
+}
+
 export function CustomDesignViewerModal({
   visible,
   onClose,
@@ -48,19 +91,31 @@ export function CustomDesignViewerModal({
   productName,
   frontImageUrl,
   backImageUrl,
+  hasCustomPreview = false,
+  productCustomization,
+  customPrice,
 }: Props) {
   const [view, setView] = useState<"front" | "back">("front");
-  const frontDesign = Array.isArray(customization?.frontDesign) ? customization.frontDesign : [];
-  const backDesign = Array.isArray(customization?.backDesign) ? customization.backDesign : [];
-  const elements = view === "front" ? frontDesign : backDesign;
-  const safeCustomization = {
-    bodyColor: customization?.bodyColor ?? "#ffffff",
-    sleeveColor: customization?.sleeveColor ?? "#ffffff",
-    collarColor: customization?.collarColor ?? "#ffffff",
-    frontDesign,
-    backDesign,
-    totalPrice: typeof customization?.totalPrice === "number" ? customization.totalPrice : 0,
+  const normalized = normalizeCustomization(customization as any);
+  const safeCustomization = normalized ?? {
+    bodyColor: customization?.bodyColor ?? (customization as any)?.body_color ?? "#ffffff",
+    sleeveColor: customization?.sleeveColor ?? (customization as any)?.sleeve_color ?? "#ffffff",
+    collarColor: customization?.collarColor ?? (customization as any)?.collar_color ?? "#ffffff",
+    cuffColor: customization?.cuffColor ?? (customization as any)?.cuff_color ?? "#ffffff",
+    neck_style: customization?.neck_style ?? (customization as any)?.neck_style ?? undefined,
+    frontDesign: Array.isArray(customization?.frontDesign) ? customization.frontDesign : Array.isArray((customization as any)?.front_design) ? (customization as any).front_design : [],
+    backDesign: Array.isArray(customization?.backDesign) ? customization.backDesign : Array.isArray((customization as any)?.back_design) ? (customization as any).back_design : [],
+    totalPrice: typeof customization?.totalPrice === "number" ? customization.totalPrice : typeof (customization as any)?.total_price === "number" ? (customization as any).total_price : 0,
   };
+  const displayTotal =
+    safeCustomization.totalPrice > 0
+      ? safeCustomization.totalPrice
+      : customPrice != null
+        ? (typeof customPrice === "string" ? parseFloat(customPrice) || 0 : customPrice)
+        : 0;
+  const frontDesign = safeCustomization.frontDesign;
+  const backDesign = safeCustomization.backDesign;
+  const elements = view === "front" ? frontDesign : backDesign;
 
   if (!visible) return null;
 
@@ -92,7 +147,11 @@ export function CustomDesignViewerModal({
               </View>
               <View style={styles.colorWrap}>
                 <View style={[styles.swatch, { backgroundColor: safeCustomization.collarColor }]} />
-                <Text style={styles.colorLabel}>Collar</Text>
+                <Text style={styles.colorLabel}>{safeCustomization.neck_style === "crew_neck" ? "Neckline" : "Collar"}</Text>
+              </View>
+              <View style={styles.colorWrap}>
+                <View style={[styles.swatch, { backgroundColor: safeCustomization.cuffColor }]} />
+                <Text style={styles.colorLabel}>Cut Off</Text>
               </View>
             </View>
 
@@ -132,15 +191,47 @@ export function CustomDesignViewerModal({
                     bodyColor={safeCustomization.bodyColor}
                     sleeveColor={safeCustomization.sleeveColor}
                     collarColor={safeCustomization.collarColor}
+                    cuffColor={safeCustomization.cuffColor}
                     colorPart="body"
                     onColorPartChange={() => { }}
                     elements={elements}
                     selectedId={null}
                     textModalVisible={false}
-                    frontImage={frontImage}
-                    backImage={backImage}
+                    frontImage={
+                      productCustomization?.front_view?.image_url
+                        ? { uri: getImageUrl(productCustomization.front_view.image_url) }
+                        : defaultFrontImage
+                    }
+                    backImage={
+                      productCustomization?.back_view?.image_url
+                        ? { uri: getImageUrl(productCustomization.back_view.image_url) }
+                        : defaultBackImage
+                    }
                     frontSvg={TSHIRT_FRONT_SVG}
                     backSvg={TSHIRT_BACK_SVG}
+                    frontRegions={productCustomization?.front_view?.regions as Record<string, ProductCustomizationRegion> | undefined}
+                    backRegions={productCustomization?.back_view?.regions as Record<string, ProductCustomizationRegion> | undefined}
+                    frontRegionMasks={
+                      productCustomization?.front_view?.region_masks
+                        ? Object.fromEntries(
+                          Object.entries(productCustomization.front_view.region_masks).map(([k, v]) => [
+                            k,
+                            v.startsWith("http") ? v : getImageUrl(v),
+                          ])
+                        )
+                        : undefined
+                    }
+                    backRegionMasks={
+                      productCustomization?.back_view?.region_masks
+                        ? Object.fromEntries(
+                          Object.entries(productCustomization.back_view.region_masks).map(([k, v]) => [
+                            k,
+                            v.startsWith("http") ? v : getImageUrl(v),
+                          ])
+                        )
+                        : undefined
+                    }
+                    neckStyle={(productCustomization?.neck_style ?? undefined) as "collar" | "crew_neck" | null | undefined}
                     onViewChange={(v) => setView(v)}
                     onColorChange={() => { }}
                     onAddText={() => { }}
@@ -160,8 +251,8 @@ export function CustomDesignViewerModal({
                   <Text style={styles.elementsListTitle}>
                     {view === "front" ? "Front" : "Back"} ({elements.length} item{elements.length !== 1 ? "s" : ""})
                   </Text>
-                  {elements.map((el, idx) => (
-                    <Text key={el.id} style={styles.elementsListItem}>
+                  {elements.map((el: DesignElement, idx: number) => (
+                    <Text key={el.id ? `${el.id}-${idx}` : `el-${idx}`} style={styles.elementsListItem}>
                       {idx + 1}. {elementSummary(el)}
                     </Text>
                   ))}
@@ -171,7 +262,7 @@ export function CustomDesignViewerModal({
 
             <View style={styles.footer}>
               <Text style={styles.totalLabel}>Design total</Text>
-              <Text style={styles.totalValue}>{formatPriceMMK(safeCustomization.totalPrice)}</Text>
+              <Text style={styles.totalValue}>{formatPriceMMK(displayTotal)}</Text>
             </View>
           </ScrollView>
         </View>

@@ -80,7 +80,7 @@ export default function RegisterScreen() {
         address.trim() || undefined,
         photoUri ?? undefined
       );
-      router.dismissAll();
+      router.dismissTo("/(tabs)/profile");
     } catch (e: any) {
       setError(e.message);
     } finally {

@@ -18,7 +18,7 @@ import * as Haptics from "expo-haptics";
 import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
-import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-client";
+import { apiRequest, queryClient, getProductImageSource, type ProductCustomization } from "@/lib/query-client";
 import { formatPriceMMK } from "@/lib/format";
 import { CustomDesignViewerModal } from "@/components/customize/CustomDesignViewerModal";
 
@@ -32,6 +32,12 @@ export default function CartScreen() {
   const { data: cartItems, isLoading } = useQuery<any[]>({
     queryKey: ["/api/cart"],
     enabled: !!user,
+  });
+
+  const viewingProductId = viewingDesignItem?.productId ?? viewingDesignItem?.product?.id;
+  const { data: productCustomization } = useQuery<ProductCustomization | null>({
+    queryKey: ["productCustomization", String(viewingProductId)],
+    enabled: !!viewingDesignItem && !!viewingProductId,
   });
 
   const updateMutation = useMutation({
@@ -79,13 +85,13 @@ export default function CartScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top + webTopInset, backgroundColor: C.background }]}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Cart</Text>
+          <Text style={[styles.headerTitle, { color: C.text }]}>Cart</Text>
         </View>
         <View style={styles.center}>
           <Ionicons name="bag-outline" size={56} color={C.textLight} />
-          <Text style={styles.emptyTitle}>Sign in to view your cart</Text>
+          <Text style={[styles.emptyTitle, { color: C.text }]}>Sign in to view your cart</Text>
           <Pressable
-            style={styles.signInBtn}
+            style={[styles.signInBtn, { backgroundColor: Colors.accent }]}
             onPress={() => router.push("/(auth)/login")}
           >
             <Text style={styles.signInBtnText}>Sign In</Text>
@@ -107,50 +113,58 @@ export default function CartScreen() {
               params: { id: item.productId.toString() },
             })
           }
+          style={styles.cartItemContent}
         >
-          <Image source={getProductImageSource(item.product.image)} style={[styles.cartItemImage, { backgroundColor: C.productImageBg }]} />
-        </Pressable>
-        <View style={styles.cartItemInfo}>
-          <Text style={[styles.cartItemName, { color: C.text }]} numberOfLines={2}>
-            {item.product.name}
-          </Text>
-          {isCustom && (
-            <Text style={[styles.cartItemVariant, { color: Colors.accent, fontWeight: "600" }]}>
-              Custom design
+          <Image
+            source={getProductImageSource(
+              isCustom && item.customization?.frontDesignImageUrl
+                ? item.customization.frontDesignImageUrl
+                : item.product?.image
+            )}
+            style={[styles.cartItemImage, { backgroundColor: C.productImageBg }]}
+          />
+          <View style={styles.cartItemInfo}>
+            <Text style={[styles.cartItemName, { color: C.text }]} numberOfLines={2}>
+              {item.product.name}
             </Text>
-          )}
-          {(item.size || item.color) && (
-            <Text style={[styles.cartItemVariant, { color: C.textSecondary }]}>
-              {[item.size, item.color].filter(Boolean).join(" / ")}
+            {isCustom && (
+              <Text style={[styles.cartItemVariant, { color: Colors.accent, fontWeight: "600" }]}>
+                Custom design
+              </Text>
+            )}
+            {item.size && (
+              <Text style={[styles.cartItemVariant, { color: C.textSecondary }]}>
+                Size: {item.size}
+              </Text>
+            )}
+            {isCustom && (
+              <Pressable
+                style={styles.viewDesignBtn}
+                onPress={(e) => { e.stopPropagation(); setViewingDesignItem(item); }}
+              >
+                <Text style={styles.viewDesignBtnText}>View design</Text>
+              </Pressable>
+            )}
+            <Text style={[styles.cartItemPrice, { color: Colors.accent }]}>
+              {formatPriceMMK(price)}
             </Text>
-          )}
-          {isCustom && (
-            <Pressable
-              style={styles.viewDesignBtn}
-              onPress={() => setViewingDesignItem(item)}
-            >
-              <Text style={styles.viewDesignBtnText}>View design</Text>
-            </Pressable>
-          )}
-          <Text style={styles.cartItemPrice}>
-            {formatPriceMMK(price)}
-          </Text>
-          <View style={styles.qtyRow}>
-            <Pressable
-              style={[styles.qtyBtn, { backgroundColor: C.surfaceSecondary }]}
-              onPress={() => handleQuantity(item, -1)}
-            >
-              <Ionicons name="remove" size={16} color={C.text} />
-            </Pressable>
-            <Text style={[styles.qtyText, { color: C.text }]}>{item.quantity}</Text>
-            <Pressable
-              style={[styles.qtyBtn, { backgroundColor: C.surfaceSecondary }]}
-              onPress={() => handleQuantity(item, 1)}
-            >
-              <Ionicons name="add" size={16} color={C.text} />
-            </Pressable>
+            <View style={styles.qtyRow}>
+              <Pressable
+                style={[styles.qtyBtn, { backgroundColor: C.surfaceSecondary }]}
+                onPress={() => handleQuantity(item, -1)}
+              >
+                <Ionicons name="remove" size={16} color={C.text} />
+              </Pressable>
+              <Text style={[styles.qtyText, { color: C.text }]}>{item.quantity}</Text>
+              <Pressable
+                style={[styles.qtyBtn, { backgroundColor: C.surfaceSecondary }]}
+                onPress={() => handleQuantity(item, 1)}
+              >
+                <Ionicons name="add" size={16} color={C.text} />
+              </Pressable>
+            </View>
           </View>
-        </View>
+        </Pressable>
         <Pressable style={styles.removeBtn} onPress={() => handleRemove(item.id)}>
           <Ionicons name="close" size={18} color={C.textLight} />
         </Pressable>
@@ -190,29 +204,42 @@ export default function CartScreen() {
           <CustomDesignViewerModal
             visible={!!viewingDesignItem}
             onClose={() => setViewingDesignItem(null)}
+            customPrice={viewingDesignItem?.customPrice}
             customization={viewingDesignItem?.customization ?? {
               bodyColor: "#ffffff",
               sleeveColor: "#ffffff",
               collarColor: "#ffffff",
+              cuffColor: "#ffffff",
               frontDesign: [],
               backDesign: [],
               totalPrice: 0,
             }}
             productName={viewingDesignItem?.product?.name ?? "Product"}
-            frontImageUrl={viewingDesignItem?.product?.image}
-            backImageUrl={viewingDesignItem?.product?.imageBack}
+            frontImageUrl={
+              viewingDesignItem?.customization?.frontDesignImageUrl ??
+              (viewingDesignItem?.customization as any)?.frontDesignImage ??
+              viewingDesignItem?.product?.image
+            }
+            backImageUrl={
+              viewingDesignItem?.customization?.backDesignImageUrl ??
+              (viewingDesignItem?.customization as any)?.backDesignImage ??
+              viewingDesignItem?.product?.imageBack ??
+              viewingDesignItem?.product?.image
+            }
+            hasCustomPreview={!!viewingDesignItem?.customization?.hasCustomPreview}
+            productCustomization={productCustomization ?? undefined}
           />
           <View style={[styles.bottomBar, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 80, backgroundColor: C.surface, borderTopColor: C.border }]}>
             <View style={styles.totalRow}>
               <Text style={[styles.totalLabel, { color: C.textSecondary }]}>Total</Text>
-              <Text style={[styles.totalValue, { color: C.text }]}>{formatPriceMMK(total)}</Text>
+              <Text style={[styles.totalValue, { color: Colors.accent }]}>{formatPriceMMK(total)}</Text>
             </View>
             <Pressable
               style={({ pressed }) => [styles.checkoutBtn, pressed && { opacity: 0.9 }]}
               onPress={() => router.push("/checkout")}
             >
               <Text style={styles.checkoutBtnText}>Checkout</Text>
-              <Ionicons name="arrow-forward" size={18} color={Colors.white} />
+              <Ionicons name="arrow-forward" size={20} color={Colors.white} />
             </Pressable>
           </View>
         </>
@@ -267,32 +294,31 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 20, paddingBottom: 220 },
   cartItem: {
     flexDirection: "row",
-    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 14,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
     ...cardShadow,
+  },
+  cartItemContent: {
+    flexDirection: "row",
+    flex: 1,
   },
   cartItemImage: {
     width: 80,
     height: 80,
     borderRadius: 12,
-    backgroundColor: Colors.productImageBg,
     resizeMode: "contain",
   },
   cartItemInfo: { flex: 1, marginLeft: 12, justifyContent: "center" },
   cartItemName: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
     marginBottom: 2,
   },
   cartItemVariant: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
     marginBottom: 2,
   },
   viewDesignBtn: {
@@ -312,7 +338,6 @@ const styles = StyleSheet.create({
   cartItemPrice: {
     fontSize: 15,
     fontFamily: "Inter_700Bold",
-    color: Colors.accent,
     marginBottom: 6,
   },
   qtyRow: {
@@ -324,16 +349,15 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: Colors.white,
     alignItems: "center",
     justifyContent: "center",
   },
   qtyText: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
     minWidth: 20,
     textAlign: "center",
+    color: Colors.text,
   },
   removeBtn: {
     padding: 4,

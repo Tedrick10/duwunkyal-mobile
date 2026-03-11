@@ -52,6 +52,7 @@ export default function CustomizeScreen() {
   const [tshirtBodyColor, setTshirtBodyColor] = useState("#ffffff");
   const [tshirtSleeveColor, setTshirtSleeveColor] = useState("#ffffff");
   const [tshirtCollarColor, setTshirtCollarColor] = useState("#ffffff");
+  const [tshirtCuffColor, setTshirtCuffColor] = useState("#ffffff");
   const [colorPart, setColorPart] = useState<string>("body");
   const [frontDesign, setFrontDesign] = useState<DesignElement[]>([]);
   const [backDesign, setBackDesign] = useState<DesignElement[]>([]);
@@ -105,13 +106,16 @@ export default function CustomizeScreen() {
       if (designEditorRef.current) {
         const prevView = view;
         const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+        const waitForPaint = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 
         try {
           setView("front");
-          await delay(300);
+          await delay(600);
+          await waitForPaint();
           const frontPath = await designEditorRef.current.captureRendered();
           setView("back");
-          await delay(300);
+          await delay(600);
+          await waitForPaint();
           const backPath = await designEditorRef.current.captureRendered();
           setView(prevView);
 
@@ -123,7 +127,12 @@ export default function CustomizeScreen() {
             const url = await uploadDesignImage(backPath);
             backImageUrl = url;
           }
-          hasCustomPreview = !!(frontImageUrl && backImageUrl);
+          // Only true when BOTH captures + uploads succeeded; avoid using baseImage as "custom preview"
+          hasCustomPreview = !!(
+            frontPath && backPath &&
+            frontImageUrl && frontImageUrl !== baseImage &&
+            backImageUrl && backImageUrl !== baseImageBack
+          );
         } catch (_) {
           setView(prevView);
         }
@@ -146,10 +155,14 @@ export default function CustomizeScreen() {
           bodyColor: tshirtBodyColor,
           sleeveColor: tshirtSleeveColor,
           collarColor: tshirtCollarColor,
+          cuffColor: tshirtCuffColor,
+          neck_style: customization?.neck_style ?? undefined,
           frontDesign,
           backDesign,
           totalPrice: finalTotal,
           hasCustomPreview,
+          frontDesignImageUrl: frontImageUrl ?? undefined,
+          backDesignImageUrl: backImageUrl ?? undefined,
         },
         customPrice: String(finalTotal),
         productOverride,
@@ -178,6 +191,29 @@ export default function CustomizeScreen() {
     enabled: !!id,
   });
 
+  // Simulate Front/Back click on first load to force 2D mock-up to paint (fixes blank on first load after app restart)
+  const hasTriggeredViewFix = useRef(false);
+  useEffect(() => {
+    hasTriggeredViewFix.current = false;
+  }, [id]);
+  useEffect(() => {
+    if (!id || customizationLoading || hasTriggeredViewFix.current) return;
+    let t1: ReturnType<typeof setTimeout> | null = null;
+    let t2: ReturnType<typeof setTimeout> | null = null;
+    // Wait for DesignEditor to mount, layout, and images to start loading
+    t1 = setTimeout(() => {
+      hasTriggeredViewFix.current = true;
+      setView((v) => (v === "front" ? "back" : "front"));
+      t2 = setTimeout(() => {
+        setView((v) => (v === "front" ? "back" : "front"));
+      }, 60);
+    }, 350);
+    return () => {
+      if (t1) clearTimeout(t1);
+      if (t2) clearTimeout(t2);
+    };
+  }, [id, customizationLoading]);
+
   const needsFrontRegions = !!(customization?.front_view?.image_url && !hasRegions(customization?.front_view?.regions));
   const needsBackRegions = !!(customization?.back_view?.image_url && !hasRegions(customization?.back_view?.regions));
   const shouldDetectRegions = !!(id && (needsFrontRegions || needsBackRegions));
@@ -193,6 +229,26 @@ export default function CustomizeScreen() {
 
   const frontRegions = customization?.front_view?.regions ?? detectRegionsData?.front_regions ?? undefined;
   const backRegions = customization?.back_view?.regions ?? detectRegionsData?.back_regions ?? undefined;
+
+  // Resolve region mask URLs so device can load (request host from API or getImageUrl fallback)
+  const frontRegionMasksResolved = React.useMemo(() => {
+    const masks = customization?.front_view?.region_masks;
+    if (!masks || typeof masks !== "object") return undefined;
+    const out: Record<string, string> = {};
+    for (const [key, url] of Object.entries(masks)) {
+      if (typeof url === "string" && url) out[key] = getImageUrl(url);
+    }
+    return Object.keys(out).length ? out : undefined;
+  }, [customization?.front_view?.region_masks]);
+  const backRegionMasksResolved = React.useMemo(() => {
+    const masks = customization?.back_view?.region_masks;
+    if (!masks || typeof masks !== "object") return undefined;
+    const out: Record<string, string> = {};
+    for (const [key, url] of Object.entries(masks)) {
+      if (typeof url === "string" && url) out[key] = getImageUrl(url);
+    }
+    return Object.keys(out).length ? out : undefined;
+  }, [customization?.back_view?.region_masks]);
 
   const customizeLoginRequired = !!id && customizationError && (customizationErr as any)?.loginRequired === true;
   const basePrice =
@@ -219,6 +275,7 @@ export default function CustomizeScreen() {
       setTshirtBodyColor(firstHex);
       setTshirtSleeveColor(firstHex);
       setTshirtCollarColor(firstHex);
+      setTshirtCuffColor(firstHex);
       customizationColorsAppliedRef.current = true;
     }
   }, [customization?.colors]);
@@ -527,6 +584,7 @@ export default function CustomizeScreen() {
     startTransition(() => {
       if (colorPart === "body") setTshirtBodyColor(color);
       else if (colorPart === "sleeves" || colorPart === "sleeve" || colorPart === "sleeve_left" || colorPart === "sleeve_right") setTshirtSleeveColor(color);
+      else if (colorPart === "cuff" || colorPart === "cut_off") setTshirtCuffColor(color);
       else setTshirtCollarColor(color);
     });
   }, [colorPart]);
@@ -693,6 +751,7 @@ export default function CustomizeScreen() {
           bodyColor={tshirtBodyColor}
           sleeveColor={tshirtSleeveColor}
           collarColor={tshirtCollarColor}
+          cuffColor={tshirtCuffColor}
           colorPart={colorPart}
           onColorPartChange={setColorPart}
           elements={currentElements}
@@ -717,6 +776,9 @@ export default function CustomizeScreen() {
           displayBaseImageAsPhoto={!!(frontImageSrc || backImageSrc) && !(customization?.colors?.length)}
           frontRegions={frontRegions}
           backRegions={backRegions}
+          frontRegionMasks={frontRegionMasksResolved}
+          backRegionMasks={backRegionMasksResolved}
+          neckStyle={customization?.neck_style ?? undefined}
         />
         <TouchableOpacity
           style={styles.preview3DWidget}

@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   TextInput,
-  FlatList,
+  ScrollView,
   Pressable,
   Image,
   ActivityIndicator,
@@ -52,106 +52,116 @@ export default function SearchScreen() {
     return result;
   }, [products, search, activeCategory]);
 
-  function renderProduct({ item }: { item: (typeof filtered)[0] }) {
-    return (
-      <Pressable
-        style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.9 }, { backgroundColor: C.surface, borderColor: C.borderLight }]}
-        onPress={() =>
-          router.push({ pathname: "/product/[id]", params: { id: item.id.toString() } })
-        }
-      >
-        <View style={[styles.productImageContainer, { backgroundColor: C.productImageBg ?? Colors.productImageBg }]}>
-          <Image source={{ uri: item.image_url }} style={styles.productImage} resizeMode="contain" />
-        </View>
-        <View style={styles.productInfo}>
-          <Text style={[styles.productName, { color: C.text }]} numberOfLines={2}>
-            {item.name}
-          </Text>
-          <ProductPriceDisplay price={item.price} salePrice={item.sale_price} />
-        </View>
-      </Pressable>
-    );
-  }
+  const rows = useMemo(() => {
+    const r: (typeof filtered)[] = [];
+    for (let i = 0; i < filtered.length; i += 2) {
+      r.push(filtered.slice(i, i + 2));
+    }
+    return r;
+  }, [filtered]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + webTopInset, backgroundColor: C.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: C.text }]}>Explore</Text>
-      </View>
+    <View style={[styles.container, { backgroundColor: C.background }]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + webTopInset, paddingBottom: 100 }]}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: C.text }]}>Explore</Text>
+        </View>
 
-      <View style={[styles.searchBar, { backgroundColor: C.surface, borderColor: C.border }]}>
-        <Ionicons name="search" size={18} color={C.textLight} />
-        <TextInput
-          style={[styles.searchInput, { color: C.text }]}
-          placeholder="Search garments..."
-          placeholderTextColor={C.textLight}
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0 && (
-          <Pressable onPress={() => setSearch("")}>
-            <Ionicons name="close-circle" size={18} color={C.textLight} />
-          </Pressable>
-        )}
-      </View>
+        <View style={[styles.searchBar, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <Ionicons name="search" size={18} color={C.textLight} />
+          <TextInput
+            style={[styles.searchInput, { color: C.text }]}
+            placeholder="Search garments..."
+            placeholderTextColor={C.textLight}
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <Pressable onPress={() => setSearch("")}>
+              <Ionicons name="close-circle" size={18} color={C.textLight} />
+            </Pressable>
+          )}
+        </View>
 
-      {categories && categories.length > 0 && (
-        <View style={styles.categoryFilter}>
-          <Pressable
-            style={[styles.filterChip, !activeCategory && styles.filterChipActive, !activeCategory && {}, { backgroundColor: !activeCategory ? Colors.accent : C.surface, borderColor: !activeCategory ? Colors.accent : C.border }]}
-            onPress={() => setActiveCategory(null)}
-          >
-            <Text style={[styles.filterChipText, !activeCategory && styles.filterChipTextActive, !activeCategory && { color: Colors.white }, { color: !activeCategory ? Colors.white : C.text }]}>
-              All
-            </Text>
-          </Pressable>
-          {categories.map((cat: any) => (
+        {categories && categories.length > 0 && (
+          <View style={styles.categoryFilter}>
             <Pressable
-              key={cat.id}
-              style={[styles.filterChip, activeCategory === cat.id && styles.filterChipActive, { backgroundColor: activeCategory === cat.id ? Colors.accent : C.surface, borderColor: activeCategory === cat.id ? Colors.accent : C.border }]}
-              onPress={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
+              style={[styles.filterChip, !activeCategory && styles.filterChipActive, { backgroundColor: !activeCategory ? Colors.accent : C.surface, borderColor: !activeCategory ? Colors.accent : C.border }]}
+              onPress={() => setActiveCategory(null)}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  activeCategory === cat.id && styles.filterChipTextActive,
-                  { color: activeCategory === cat.id ? Colors.white : C.text }
-                ]}
-              >
-                {cat.name}
+              <Text style={[styles.filterChipText, !activeCategory && styles.filterChipTextActive, { color: !activeCategory ? Colors.white : C.text }]}>
+                All
               </Text>
             </Pressable>
-          ))}
-        </View>
-      )}
+            {categories.map((cat: any) => (
+              <Pressable
+                key={cat.id}
+                style={[styles.filterChip, activeCategory === cat.id && styles.filterChipActive, { backgroundColor: activeCategory === cat.id ? Colors.accent : C.surface, borderColor: activeCategory === cat.id ? Colors.accent : C.border }]}
+                onPress={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    activeCategory === cat.id && styles.filterChipTextActive,
+                    { color: activeCategory === cat.id ? Colors.white : C.text }
+                  ]}
+                >
+                  {cat.name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
-      {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={C.accent} />
-          <Text style={[styles.loadingText, { color: C.textSecondary }]}>Loading...</Text>
-        </View>
-      ) : filtered.length === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="search-outline" size={48} color={C.textLight} />
-          <Text style={[styles.emptyText, { color: C.textSecondary }]}>No products found</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          renderItem={renderProduct}
-          keyExtractor={(item) => item.id.toString()}
-          numColumns={2}
-          contentContainerStyle={styles.grid}
-          columnWrapperStyle={styles.gridRow}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        {isLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={C.accent} />
+            <Text style={[styles.loadingText, { color: C.textSecondary }]}>Loading...</Text>
+          </View>
+        ) : filtered.length === 0 ? (
+          <View style={styles.center}>
+            <Ionicons name="search-outline" size={48} color={C.textLight} />
+            <Text style={[styles.emptyText, { color: C.textSecondary }]}>No products found</Text>
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {rows.map((row, rowIndex) => (
+              <View key={rowIndex} style={styles.gridRow}>
+                {row.map((item) => (
+                  <Pressable
+                    key={item.id}
+                    style={({ pressed }) => [styles.productCard, pressed && { opacity: 0.9 }, { backgroundColor: C.surface, borderColor: C.borderLight }]}
+                    onPress={() => router.push({ pathname: "/product/[id]", params: { id: item.id.toString() } })}
+                  >
+                    <View style={[styles.productImageContainer, { backgroundColor: C.productImageBg ?? Colors.productImageBg }]}>
+                      <Image source={{ uri: item.image_url }} style={styles.productImage} resizeMode="contain" />
+                    </View>
+                    <View style={styles.productInfo}>
+                      <Text style={[styles.productName, { color: C.text }]} numberOfLines={2}>
+                        {item.name}
+                      </Text>
+                      <ProductPriceDisplay price={item.price} salePrice={item.sale_price} />
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   headerTitle: {
     fontSize: 26,
@@ -205,7 +215,7 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: Colors.white,
   },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  center: { minHeight: 200, alignItems: "center", justifyContent: "center", gap: 12 },
   loadingText: {
     fontSize: 14,
     fontFamily: "Inter_500Medium",
@@ -216,8 +226,8 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
-  grid: { paddingHorizontal: 20, paddingBottom: 100 },
-  gridRow: { gap: 14 },
+  grid: { paddingHorizontal: 20 },
+  gridRow: { flexDirection: "row", gap: 14, marginBottom: 14 },
   productCard: {
     width: CARD_WIDTH,
     backgroundColor: Colors.surface,
@@ -225,7 +235,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: Colors.borderLight,
-    marginBottom: 14,
     ...cardShadow,
   },
   productImageContainer: {

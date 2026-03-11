@@ -20,6 +20,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient, getProductImageSource } from "@/lib/query-client";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { formatPriceMMK } from "@/lib/format";
+import { CustomizationColorsDisplay } from "@/components/customize/CustomizationColorsDisplay";
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -114,8 +115,8 @@ export default function CheckoutScreen() {
           {cartItems?.map((item) => {
             const isCustom = item.customization != null;
             const price = parseFloat(item.customPrice ?? item.product?.price ?? "0") * item.quantity;
-            const imgFront = item.product?.image ?? item.product?.image_url;
-            const imgBack = item.product?.imageBack ?? item.product?.image_back;
+            const imgFront = item.customization?.frontDesignImageUrl ?? item.product?.image ?? item.product?.image_url;
+            const imgBack = item.customization?.backDesignImageUrl ?? item.product?.imageBack ?? item.product?.image_back;
             return (
               <View key={item.id} style={styles.summaryCard}>
                 <View style={styles.summaryImages}>
@@ -147,10 +148,12 @@ export default function CheckoutScreen() {
                   <Text style={styles.summaryVariant}>
                     Qty: {item.quantity}
                     {item.size ? ` • ${item.size}` : ""}
-                    {item.color ? ` • ${item.color}` : ""}
                   </Text>
                   {isCustom && (
-                    <Text style={styles.summaryCustom}>Custom design</Text>
+                    <>
+                      <Text style={styles.summaryCustom}>Custom design</Text>
+                      <CustomizationColorsDisplay customization={item.customization} compact />
+                    </>
                   )}
                 </View>
                 <Text style={styles.summaryPrice}>{formatPriceMMK(price)}</Text>

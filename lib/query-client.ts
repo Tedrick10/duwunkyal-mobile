@@ -40,19 +40,22 @@ function normalizeProduct(p: any): any {
   };
 }
 
-/** Normalize order: ensure items[].product has image/imageBack/price, merge productOverride when present */
+/** Normalize order: ensure items[].product has image/imageBack from customization or snapshot */
 function normalizeOrder(order: any): any {
   if (!order) return order;
   const items = Array.isArray(order.items) ? order.items : [];
   return {
     ...order,
     items: items.map((it: any) => {
+      const cust = it.customization;
+      const customFront = cust?.frontDesignImageUrl ?? cust?.frontDesignImage ?? null;
+      const customBack = cust?.backDesignImageUrl ?? cust?.backDesignImage ?? null;
       const po = it.productOverride ?? it.product_override;
       const merged = it.product
         ? normalizeProduct({
           ...it.product,
-          image: po?.image ?? it.product.image ?? it.product.image_url,
-          imageBack: po?.imageBack ?? po?.image_back ?? it.product.imageBack ?? it.product.image_back ?? it.product.image ?? it.product.image_url,
+          image: customFront ?? po?.image ?? it.product.image ?? it.product.image_url,
+          imageBack: customBack ?? po?.imageBack ?? po?.image_back ?? it.product.imageBack ?? it.product.image_back ?? it.product.image ?? it.product.image_url,
         })
         : it.product;
       return { ...it, product: merged };
@@ -72,6 +75,7 @@ export type ProductListItem = {
   price: number;
   sale_price: number | null;
   featured: boolean;
+  customize_enabled?: boolean;
 };
 
 export type ProductDetailSize = { id: number; name: string };
@@ -144,6 +148,8 @@ export type ProductCustomizationRegion = {
 export type ProductCustomizationView = {
   image_url: string;
   regions: Record<string, ProductCustomizationRegion>;
+  /** Optional per-region mask image URLs (body, collar, sleeve, cuff) for precise coloring. */
+  region_masks?: Record<string, string> | null;
 };
 
 export type ProductCustomizationView3D = {
@@ -169,6 +175,8 @@ export type ProductCustomization = {
   product_id: number;
   product_name: string;
   customize_enabled: boolean;
+  /** collar = shirt/polo, crew_neck = T-shirt → app shows "Neckline" instead of "Collar" */
+  neck_style?: "collar" | "crew_neck" | null;
   /** Base price from API when provided; otherwise use productDetail */
   base_price?: number | null;
   front_view: ProductCustomizationView;
@@ -253,6 +261,7 @@ export async function apiRequest(
         bodyColor?: string;
         sleeveColor?: string;
         collarColor?: string;
+        cuffColor?: string;
         frontDesign?: unknown;
         backDesign?: unknown;
         totalPrice?: number;
@@ -266,20 +275,30 @@ export async function apiRequest(
       const productOverride =
         po && typeof po === "object"
           ? {
+            id: po.id,
+            name: po.name,
+            price: po.price,
             image: po.image ? (String(po.image).startsWith("http") ? po.image : getImageUrl(po.image)) : null,
             imageBack: po.imageBack ? (String(po.imageBack).startsWith("http") ? po.imageBack : getImageUrl(po.imageBack)) : null,
           }
-          : { image: null, imageBack: null };
-      const cust = body.customization;
+          : null;
+      const cust = body.customization as Record<string, unknown> | null | undefined;
+      const get = (c: Record<string, unknown>, ...keys: string[]) =>
+        keys.reduce<unknown>((v, k) => v ?? c[k], undefined);
       const customization =
         cust && typeof cust === "object"
           ? {
-            bodyColor: cust.bodyColor ?? null,
-            sleeveColor: cust.sleeveColor ?? null,
-            collarColor: cust.collarColor ?? null,
-            frontDesign: cust.frontDesign ?? null,
-            backDesign: cust.backDesign ?? null,
-            totalPrice: cust.totalPrice ?? null,
+            bodyColor: get(cust, "bodyColor", "body_color") ?? null,
+            sleeveColor: get(cust, "sleeveColor", "sleeve_color") ?? null,
+            collarColor: get(cust, "collarColor", "collar_color") ?? null,
+            cuffColor: get(cust, "cuffColor", "cuff_color") ?? null,
+            frontDesign: get(cust, "frontDesign", "front_design") ?? null,
+            backDesign: get(cust, "backDesign", "back_design") ?? null,
+            totalPrice: get(cust, "totalPrice", "total_price", "designTotal", "design_total") ?? null,
+            neck_style: get(cust, "neck_style") ?? null,
+            hasCustomPreview: get(cust, "hasCustomPreview", "has_custom_preview") ?? null,
+            frontDesignImageUrl: get(cust, "frontDesignImageUrl", "frontDesignImage", "front_design_image_url") ?? null,
+            backDesignImageUrl: get(cust, "backDesignImageUrl", "backDesignImage", "back_design_image_url") ?? null,
           }
           : null;
       const customPriceVal = body.customPrice != null ? (typeof body.customPrice === "number" ? body.customPrice : Number(body.customPrice) || body.customPrice) : null;
@@ -618,16 +637,27 @@ export const getQueryFn: <T>(options: {
           }
           const list = (await res.json()) as any[];
           return (Array.isArray(list) ? list : []).map((item) => {
+            const cust = item.customization;
+            const customFront = cust?.frontDesignImageUrl ?? cust?.frontDesignImage ?? null;
+            const customBack = cust?.backDesignImageUrl ?? cust?.backDesignImage ?? null;
             const snap = item.product_snapshot ?? item.productSnapshot;
             const po = item.productOverride ?? item.product_override;
             const merged = item.product
               ? normalizeProduct({
                 ...item.product,
-                image: po?.image ?? snap?.image ?? item.product.image ?? item.product.image_url,
-                imageBack: po?.imageBack ?? po?.image_back ?? snap?.imageBack ?? snap?.image_back ?? item.product.imageBack ?? item.product.image_back ?? item.product.image ?? item.product.image_url,
+                image: customFront ?? po?.image ?? snap?.image ?? item.product.image ?? item.product.image_url,
+                imageBack: customBack ?? po?.imageBack ?? po?.image_back ?? snap?.imageBack ?? snap?.image_back ?? item.product.imageBack ?? item.product.image_back ?? item.product.image ?? item.product.image_url,
               })
               : item.product;
-            return { ...item, product: merged };
+            const mergedCustomization =
+              cust && typeof cust === "object"
+                ? {
+                  ...cust,
+                  frontDesignImageUrl: customFront ?? cust.frontDesignImageUrl ?? cust.frontDesignImage ?? null,
+                  backDesignImageUrl: customBack ?? cust.backDesignImageUrl ?? cust.backDesignImage ?? null,
+                }
+                : cust;
+            return { ...item, product: merged, customization: mergedCustomization ?? item.customization };
           }) as any;
         }
         return (await LocalDataService.getCart()) as any;

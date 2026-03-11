@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, forwardRef, useImperativeHandle, useState, useDeferredValue, memo } from "react";
+import React, { useRef, useMemo, forwardRef, useImperativeHandle, useState, useDeferredValue, memo, useCallback } from "react";
 import {
   View,
   Image,
@@ -70,9 +70,14 @@ type Props = {
   /** Template regions from API (body, collar, sleeve, cuff with rect/ellipse in 0–100%). When set, colors are applied per region. */
   frontRegions?: Record<string, ProductCustomizationRegion>;
   backRegions?: Record<string, ProductCustomizationRegion>;
+  /** Per-region mask image URLs for precise coloring (when set, used instead of rect/ellipse for that region). */
+  frontRegionMasks?: Record<string, string> | null;
+  backRegionMasks?: Record<string, string> | null;
   /** Segment labels from Clothing Segments API (for display names e.g. Cuff → Cut Off). */
   frontSegmentLabels?: SegmentLabelItem[] | null;
   backSegmentLabels?: SegmentLabelItem[] | null;
+  /** crew_neck = T-shirt: show "Neckline" instead of "Collar" for that region. */
+  neckStyle?: "collar" | "crew_neck" | null;
 };
 
 export type DesignEditorRef = {
@@ -92,10 +97,14 @@ const DEFAULT_FALLBACK_REGIONS: Record<string, ProductCustomizationRegion> = {
   cuff: { type: "rect", x: 5, y: 70, width: 90, height: 12 },
 };
 
-/** Display label for region key (e.g. cuff → Cut Off). */
-function getRegionLabel(key: string, segmentLabels?: SegmentLabelItem[] | null): string {
+/** Display label for region key (e.g. cuff → Cut Off). crew_neck → "Neckline" instead of "Collar". */
+function getRegionLabel(
+  key: string,
+  segmentLabels?: SegmentLabelItem[] | null,
+  neckStyle?: "collar" | "crew_neck" | null
+): string {
   if (key === "body") return "Body";
-  if (key === "collar") return "Collar";
+  if (key === "collar") return neckStyle === "crew_neck" ? "Neckline" : "Collar";
   if (key === "sleeve" || key === "sleeve_left" || key === "sleeve_right") return "Sleeve";
   if (key === "cuff" || key === "cut_off") return "Cut Off";
   const seg = segmentLabels?.find((s) => s.name.toLowerCase() === key.replace(/_/g, " "));
@@ -549,35 +558,67 @@ const DesignEditorInner = memo(function DesignEditorInner({
   displayBaseImageAsPhoto = false,
   frontRegions,
   backRegions,
+  frontRegionMasks,
+  backRegionMasks,
   frontSegmentLabels,
   backSegmentLabels,
+  neckStyle,
   viewShotRef,
   captureShotRef,
 }: Props & { viewShotRef: React.RefObject<ViewShot | null>; captureShotRef: React.RefObject<ViewShot | null> }) {
   const currentRegions = view === "front" ? frontRegions : backRegions;
+  const currentRegionMasks = view === "front" ? frontRegionMasks : backRegionMasks;
   const currentSegmentLabels = view === "front" ? frontSegmentLabels : backSegmentLabels;
-  const hasTemplateRegions = currentRegions && Object.keys(currentRegions).length > 0;
+  const regionKeysFromRegions = Object.keys(currentRegions || {});
+  const regionKeysFromMasks = Object.keys(currentRegionMasks || {});
+  const allRegionKeys = Array.from(new Set([...regionKeysFromRegions, ...regionKeysFromMasks]));
+  // Draw order: body first, then sleeve, cuff, collar last so collar/smaller regions overlay and don’t get overwritten by sleeve
+  const REGION_DRAW_ORDER = ["body", "sleeve", "sleeve_left", "sleeve_right", "cuff", "cut_off", "collar"];
+  const sortedRegionKeysForDraw = [...allRegionKeys].sort((a, b) => {
+    const i = REGION_DRAW_ORDER.indexOf(a);
+    const j = REGION_DRAW_ORDER.indexOf(b);
+    if (i >= 0 && j >= 0) return i - j;
+    if (i >= 0) return -1;
+    if (j >= 0) return 1;
+    return a.localeCompare(b);
+  });
+  const hasTemplateRegions = allRegionKeys.length > 0;
   const regionButtons: Array<{ id: string; label: string }> = hasTemplateRegions
-    ? Object.keys(currentRegions).map((key) => ({
+    ? allRegionKeys.map((key) => ({
       id: key,
-      label: getRegionLabel(key, currentSegmentLabels),
+      label: getRegionLabel(key, currentSegmentLabels, neckStyle),
     }))
     : [
       { id: "body", label: "Body" },
       { id: "sleeve", label: "Sleeve" },
-      { id: "collar", label: "Collar" },
+      { id: "collar", label: getRegionLabel("collar", null, neckStyle) },
       { id: "cuff", label: "Cut Off" },
     ];
 
-  // Defer expensive SVG tint so Front/Back and color taps feel instant
+  // Track mask image loads so MaskedView re-renders when remote mask is ready (fixes race on Android/iOS)
+  const [maskLoadedKeys, setMaskLoadedKeys] = useState<Set<string>>(() => new Set());
+  const [, setBaseImageLoaded] = useState(0);
+  const onBaseImageLoad = useCallback(() => setBaseImageLoaded((n) => n + 1), []);
+  const onMaskLoad = useCallback((viewKey: string, regionKey: string) => {
+    setMaskLoadedKeys((prev) => {
+      const k = `${viewKey}-${regionKey}`;
+      if (prev.has(k)) return prev;
+      const next = new Set(prev);
+      next.add(k);
+      return next;
+    });
+  }, []);
+
+  // Defer expensive SVG tint so Front/Back and color taps feel instant.
+  // Use `view` (not deferred) for silhouette/svg so 2D mock-up shows on first load (deferred can be stale initially).
   const deferredView = useDeferredValue(view);
   const deferredBodyColor = useDeferredValue(bodyColor);
   const deferredSleeveColor = useDeferredValue(sleeveColor);
   const deferredCollarColor = useDeferredValue(collarColor);
   const deferredCuffColor = useDeferredValue(cuffColor);
 
-  const deferredSilhouetteSource = deferredView === "front" ? frontImage : backImage;
-  const deferredSvgSource = deferredView === "front" ? frontSvg : backSvg;
+  const silhouetteSource = view === "front" ? frontImage : backImage;
+  const svgSource = view === "front" ? frontSvg : backSvg;
   const selectedColor =
     colorPart === "body"
       ? bodyColor
@@ -588,8 +629,8 @@ const DesignEditorInner = memo(function DesignEditorInner({
           : collarColor;
 
   const svgFitted = useMemo(
-    () => (deferredSvgSource ? ensureSvgFits(deferredSvgSource) : null),
-    [deferredSvgSource]
+    () => (svgSource ? ensureSvgFits(svgSource) : null),
+    [svgSource]
   );
   const tintedCollarSvg = useMemo(
     () => (svgFitted ? tintSvgFills(svgFitted, deferredCollarColor) : null),
@@ -613,7 +654,7 @@ const DesignEditorInner = memo(function DesignEditorInner({
   };
 
   const renderRegion = (color: string, key: string, region: "collar" | "body" | "sleeve") => {
-    const src = deferredSilhouetteSource;
+    const src = silhouetteSource;
     if (displayBaseImageAsPhoto) {
       return (
         <Image
@@ -638,7 +679,7 @@ const DesignEditorInner = memo(function DesignEditorInner({
       );
     }
     const applyColorOverBackendImage =
-      !deferredSvgSource && src && typeof (src as any)?.uri === "string";
+      !svgSource && src && typeof (src as any)?.uri === "string";
     if (applyColorOverBackendImage) {
       return (
         <MaskedView
@@ -709,33 +750,63 @@ const DesignEditorInner = memo(function DesignEditorInner({
             <View style={[StyleSheet.absoluteFill, { width: CONTAINER_W, height: CONTAINER_H }]} pointerEvents="none">
               {displayBaseImageAsPhoto ? (
                 <Image
-                  source={deferredSilhouetteSource}
+                  source={silhouetteSource}
                   style={[StyleSheet.absoluteFill, styles.tshirtBg]}
                   resizeMode="contain"
+                  onLoad={onBaseImageLoad}
                 />
               ) : hasTemplateRegions ? (
                 <>
                   <Image
-                    source={deferredSilhouetteSource}
+                    source={silhouetteSource}
                     style={[StyleSheet.absoluteFill, styles.tshirtBg]}
                     resizeMode="contain"
+                    onLoad={onBaseImageLoad}
                   />
-                  {Object.entries(currentRegions).map(([regionKey, region]) => {
+                  {sortedRegionKeysForDraw.map((regionKey) => {
                     const color = getColorForRegionKey(regionKey);
                     const w = CONTAINER_W;
                     const h = CONTAINER_H;
-                    const isRect =
-                      region.type === "rect" &&
+                    const maskUrl = currentRegionMasks?.[regionKey];
+                    const region = currentRegions?.[regionKey];
+                    if (maskUrl) {
+                      return (
+                        <MaskedView
+                          key={`region-${deferredView}-${regionKey}`}
+                          style={[StyleSheet.absoluteFill, styles.tshirtBg, { width: w, height: h }]}
+                          maskElement={
+                            <Image
+                              source={{ uri: maskUrl }}
+                              style={[StyleSheet.absoluteFill, styles.tshirtBg, { width: w, height: h }]}
+                              resizeMode="contain"
+                              onLoad={() => onMaskLoad(deferredView, regionKey)}
+                            />
+                          }
+                        >
+                          <View style={[StyleSheet.absoluteFill, styles.tshirtBg, { backgroundColor: color, opacity: 1 }]} />
+                        </MaskedView>
+                      );
+                    }
+                    if (!region) return null;
+                    const hasRectCoords =
                       typeof region.x === "number" &&
-                      (typeof region.width === "number" || typeof (region as any).w === "number");
+                      typeof region.y === "number" &&
+                      (typeof region.width === "number" || typeof (region as any).w === "number") &&
+                      (typeof region.height === "number" || typeof (region as any).h === "number");
+                    const hasEllipseCoords =
+                      typeof region.cx === "number" &&
+                      typeof region.cy === "number" &&
+                      typeof region.rx === "number" &&
+                      typeof region.ry === "number";
+                    const isRect =
+                      (region.type === "rect" || (!region.type && hasRectCoords)) && hasRectCoords;
                     const isEllipse =
-                      region.type === "ellipse" ||
-                      (typeof region.cx === "number" && typeof region.rx === "number");
+                      region.type === "ellipse" || hasEllipseCoords;
                     if (!isRect && !isEllipse) return null;
                     return (
                       <MaskedView
                         key={`region-${deferredView}-${regionKey}`}
-                        style={[StyleSheet.absoluteFill, styles.tshirtBg]}
+                        style={[StyleSheet.absoluteFill, styles.tshirtBg, { width: w, height: h }]}
                         maskElement={
                           <View style={[StyleSheet.absoluteFill, { width: w, height: h }]}>
                             <Svg width={w} height={h} style={StyleSheet.absoluteFill}>
@@ -760,7 +831,7 @@ const DesignEditorInner = memo(function DesignEditorInner({
                           </View>
                         }
                       >
-                        <View style={[StyleSheet.absoluteFill, styles.tshirtBg, { backgroundColor: color, opacity: 0.85 }]} />
+                        <View style={[StyleSheet.absoluteFill, styles.tshirtBg, { backgroundColor: color, opacity: 1 }]} />
                       </MaskedView>
                     );
                   })}

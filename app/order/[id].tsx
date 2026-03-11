@@ -12,11 +12,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { useTheme } from "@/lib/theme-context";
 import { getProductImageSource } from "@/lib/query-client";
 import { formatPriceMMK } from "@/lib/format";
+import { CustomizationColorsDisplay } from "@/components/customize/CustomizationColorsDisplay";
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams();
+  const { colors: C } = useTheme();
 
   const { data: order, isLoading } = useQuery<any>({
     queryKey: ["/api/orders", id],
@@ -51,10 +54,10 @@ export default function OrderDetailScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <View style={styles.card}>
+    <ScrollView style={[styles.container, { backgroundColor: C.background }]} contentContainerStyle={{ paddingBottom: 40 }}>
+      <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
         <View style={styles.orderHeader}>
-          <Text style={styles.orderTitle}>{order.number ?? `Order #${order.id}`}</Text>
+          <Text style={[styles.orderTitle, { color: C.text }]}>{order.number ?? `Order #${order.id}`}</Text>
           <View
             style={[
               styles.statusBadge,
@@ -66,7 +69,7 @@ export default function OrderDetailScreen() {
             </Text>
           </View>
         </View>
-        <Text style={styles.orderDate}>
+        <Text style={[styles.orderDate, { color: C.textSecondary }]}>
           {new Date(order.createdAt).toLocaleDateString("en-US", {
             year: "numeric",
             month: "long",
@@ -97,25 +100,25 @@ export default function OrderDetailScreen() {
         }
         const iconColor = "#60a5fa";
         return (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Shipping Details</Text>
+          <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+            <Text style={[styles.cardTitle, { color: C.text }]}>Shipping Details</Text>
             <>
               {name && (
                 <View style={styles.shippingRow}>
                   <Ionicons name="person-outline" size={18} color={iconColor} style={styles.shippingIcon} />
-                  <Text style={styles.addressText}>{name}</Text>
+                  <Text style={[styles.addressText, { color: C.textSecondary }]}>{name}</Text>
                 </View>
               )}
               {phone && (
                 <View style={[styles.shippingRow, { marginTop: 8 }]}>
                   <Ionicons name="call-outline" size={18} color={iconColor} style={styles.shippingIcon} />
-                  <Text style={styles.addressText}>{phone}</Text>
+                  <Text style={[styles.addressText, { color: C.textSecondary }]}>{phone}</Text>
                 </View>
               )}
               {address && (
                 <View style={[styles.shippingRow, { marginTop: 8 }]}>
                   <Ionicons name="location-outline" size={18} color={iconColor} style={styles.shippingIcon} />
-                  <Text style={styles.addressText}>{address}</Text>
+                  <Text style={[styles.addressText, { color: C.textSecondary }]}>{address}</Text>
                 </View>
               )}
             </>
@@ -124,53 +127,67 @@ export default function OrderDetailScreen() {
       })()}
 
       {order.notes && order.notes.trim() && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Order notes</Text>
-          <Text style={styles.notesText}>{order.notes}</Text>
+        <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <Text style={[styles.cardTitle, { color: C.text }]}>Order notes</Text>
+          <Text style={[styles.notesText, { color: C.textSecondary }]}>{order.notes}</Text>
         </View>
       )}
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Items</Text>
+      <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+        <Text style={[styles.cardTitle, { color: C.text }]}>Items</Text>
         {order.items?.map((item: any) => {
           const isCustom = !!item.customization;
-          const imgFront = item.product?.image ?? item.product?.image_url;
-          const imgBack = item.product?.imageBack ?? item.product?.image_back;
+          const imgFront = item.customization?.frontDesignImageUrl ?? item.product?.image ?? item.product?.image_url;
+          const imgBack = item.customization?.backDesignImageUrl ?? item.product?.imageBack ?? item.product?.image_back;
           return (
-            <View key={item.id} style={styles.item}>
-              {isCustom && imgFront && imgBack && imgBack !== imgFront ? (
-                <View style={styles.itemImages}>
-                  <Image source={getProductImageSource(imgFront)} style={styles.itemImage} />
-                  <Image source={getProductImageSource(imgBack)} style={[styles.itemImage, styles.itemImageSecond]} />
-                </View>
-              ) : (imgFront || item.product?.image) ? (
-                <Image source={getProductImageSource(imgFront || item.product?.image)} style={styles.itemImage} />
-              ) : null}
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.product?.name || "Product"}</Text>
-                <Text style={styles.itemVariant}>
-                  Qty: {item.quantity}
-                  {item.size ? ` • ${item.size}` : ""}
-                  {item.color ? ` • ${item.color}` : ""}
-                  {item.customization && " • Custom design"}
-                </Text>
-                {item.customization?.bodyColor && (
-                  <View style={styles.colorRow}>
-                    <View style={[styles.colorSwatch, { backgroundColor: item.customization.bodyColor }]} />
-                    <Text style={styles.colorText}>Color: {item.customization.bodyColor}</Text>
+            <View key={item.id} style={[styles.itemCard, { backgroundColor: C.surfaceSecondary, borderColor: C.border }]}>
+              <View style={styles.itemRow}>
+                {isCustom && imgFront && imgBack && imgBack !== imgFront ? (
+                  <View style={styles.itemImages}>
+                    <Image source={getProductImageSource(imgFront)} style={[styles.itemImage, { backgroundColor: C.productImageBg }]} />
+                    <Image source={getProductImageSource(imgBack)} style={[styles.itemImage, styles.itemImageSecond, { backgroundColor: C.productImageBg }]} />
                   </View>
-                )}
+                ) : (imgFront || item.product?.image) ? (
+                  <Image source={getProductImageSource(imgFront || item.product?.image)} style={[styles.itemImage, { backgroundColor: C.productImageBg }]} />
+                ) : null}
+                <View style={styles.itemInfo}>
+                  <Text style={[styles.itemName, { color: C.text }]} numberOfLines={2}>
+                    {item.product?.name || "Product"}
+                  </Text>
+                  <View style={styles.itemMetaRow}>
+                    <Text style={[styles.itemMeta, { color: C.textSecondary }]}>
+                      Qty {item.quantity}
+                      {item.size ? ` · Size: ${item.size}` : ""}
+                    </Text>
+                    {isCustom && (
+                      <View style={[styles.customBadge, { backgroundColor: `${Colors.accent}15` }]}>
+                        <Text style={styles.customBadgeText}>Custom</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
               </View>
-              <Text style={styles.itemPrice}>
-                {formatPriceMMK(parseFloat(item.price) * item.quantity)}
-              </Text>
+              {isCustom && (
+                <View style={[styles.colorsSection, { borderTopColor: C.border }]}>
+                  <Text style={[styles.colorsSectionLabel, { color: C.textSecondary }]}>Clothes colors</Text>
+                  <CustomizationColorsDisplay customization={item.customization} compact noMargin />
+                </View>
+              )}
+              <View style={[styles.itemPriceRow, { borderTopColor: C.border }]}>
+                <Text style={[styles.itemPriceLabel, { color: C.textSecondary }]}>
+                  {item.quantity} × {formatPriceMMK(parseFloat(item.price))}
+                </Text>
+                <Text style={[styles.itemPrice, { color: C.text }]}>
+                  {formatPriceMMK(parseFloat(item.price) * item.quantity)}
+                </Text>
+              </View>
             </View>
           );
         })}
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: C.border }]} />
         <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>{formatPriceMMK(order.total)}</Text>
+          <Text style={[styles.totalLabel, { color: C.text }]}>Total</Text>
+          <Text style={[styles.totalValue, { color: Colors.accent }]}>{formatPriceMMK(order.total)}</Text>
         </View>
       </View>
     </ScrollView>
@@ -245,64 +262,91 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 20,
   },
-  item: {
-    flexDirection: "row",
-    alignItems: "center",
+  itemCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
     marginBottom: 12,
+    overflow: "hidden",
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   itemImages: {
     flexDirection: "row",
-    gap: 6,
+    gap: 8,
   },
   itemImage: {
-    width: 52,
-    height: 52,
+    width: 64,
+    height: 64,
     borderRadius: 10,
-    backgroundColor: Colors.white,
     resizeMode: "contain",
   },
   itemImageSecond: {
     marginLeft: 0,
   },
-  itemInfo: { flex: 1, marginLeft: 12 },
+  itemInfo: {
+    flex: 1,
+    marginLeft: 14,
+    minWidth: 0,
+  },
   itemName: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
+    marginBottom: 4,
   },
-  itemVariant: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  colorRow: {
+  itemMetaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 4,
+    flexWrap: "wrap",
+    gap: 8,
   },
-  colorSwatch: {
-    width: 14,
-    height: 14,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  colorText: {
-    fontSize: 11,
+  itemMeta: {
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
+  },
+  customBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  customBadgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
+  },
+  colorsSection: {
+    borderTopWidth: 1,
+    marginTop: 12,
+    paddingTop: 10,
+  },
+  colorsSectionLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  itemPriceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    marginTop: 10,
+    paddingTop: 10,
+  },
+  itemPriceLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
   },
   itemPrice: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
   },
   divider: {
     height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: 12,
+    marginVertical: 16,
   },
   totalRow: {
     flexDirection: "row",

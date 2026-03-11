@@ -14,12 +14,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from "react-native";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  interpolate,
-} from "react-native-reanimated";
+import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,7 +22,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors, { cardShadow } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
-import { formatPriceMMK } from "@/lib/format";
 import { ProductPriceDisplay } from "@/components/ProductPriceDisplay";
 import { type CategoryItem, type ProductListItem } from "@/lib/query-client";
 import { apiMobileUrl } from "@/lib/api-config";
@@ -36,20 +30,24 @@ import { NotificationIconWithBadge } from "@/components/NotificationIconWithBadg
 export type BannerItem = { id: number; image_url: string };
 
 const { width } = Dimensions.get("window");
-const CARD_WIDTH = (width - 48 - 12) / 2;
-const BANNER_WIDTH = width - 40;
-const BANNER_HEIGHT = 200;
-const BANNER_GAP = 12;
-const AUTO_SCROLL_INTERVAL = 4000;
+const H_PADDING = 20;
+const BANNER_WIDTH = width - H_PADDING * 2;
+const BANNER_HEIGHT = 180;
+const BANNER_GAP = 16;
+const AUTO_SCROLL_INTERVAL = 4500;
+const SECTION_SPACING = 32;
+const CARD_GAP = 14;
+const PRODUCT_CARD_WIDTH = 148;
+const CATEGORY_SIZE = 80;
 
 function BannerDot({ index, activeIndex, accentColor }: { index: number; activeIndex: number; accentColor: string }) {
   const dotStyle = useAnimatedStyle(() => {
     const isActive = activeIndex === index;
     return {
-      width: withTiming(isActive ? 20 : 8, { duration: 250 }),
-      height: 8,
-      borderRadius: 4,
-      opacity: withTiming(isActive ? 1 : 0.4, { duration: 250 }),
+      width: withTiming(isActive ? 18 : 6, { duration: 200 }),
+      height: 6,
+      borderRadius: 3,
+      opacity: withTiming(isActive ? 1 : 0.35, { duration: 200 }),
       backgroundColor: isActive ? accentColor : "#c0c4cc",
     };
   });
@@ -92,6 +90,7 @@ export default function HomeScreen() {
     queryKey: ["featuredProductList"],
   });
   const hotProducts: ProductListItem[] = featuredProductListData?.products ?? [];
+  const customizeProducts: ProductListItem[] = products.filter((p) => p.customize_enabled === true);
 
   const { data: bannerData, refetch: refetchBanners } = useQuery<{ banners: BannerItem[] }>({
     queryKey: ["bannerList"],
@@ -164,6 +163,10 @@ export default function HomeScreen() {
     </View>
   );
 
+  const sectionContainerStyle = [styles.section, { marginBottom: SECTION_SPACING }];
+  const horizontalPadding = { paddingHorizontal: H_PADDING };
+  const productCardStyle = { width: PRODUCT_CARD_WIDTH };
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: C.background }]}
@@ -171,12 +174,13 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} tintColor={Colors.accent} />}
     >
-      <View style={styles.header}>
+      {/* Header */}
+      <View style={[styles.header, horizontalPadding]}>
         <View>
           <Text style={[styles.greeting, { color: C.textSecondary }]}>
             {user ? `Hi, ${user.name.split(" ")[0]}` : "Welcome"}
           </Text>
-          <Text style={[styles.headerTitle, { color: C.text }]}>DUWUN KYAL</Text>
+          <Text style={[styles.headerTitle, { color: C.text }]}>Duwun Kyal</Text>
         </View>
         <Pressable
           style={[styles.notifBtn, { backgroundColor: C.surface, borderColor: C.border }]}
@@ -193,8 +197,9 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
+      {/* Banner */}
       {bannerItems.length > 0 && (
-        <View style={styles.section}>
+        <View style={sectionContainerStyle}>
           <FlatList
             ref={bannerRef}
             data={bannerItems}
@@ -205,7 +210,7 @@ export default function HomeScreen() {
             snapToInterval={BANNER_WIDTH + BANNER_GAP}
             snapToAlignment="start"
             decelerationRate="fast"
-            contentContainerStyle={[styles.bannerList, { paddingHorizontal: 20 }]}
+            contentContainerStyle={[styles.bannerList, horizontalPadding]}
             ItemSeparatorComponent={() => <View style={{ width: BANNER_GAP }} />}
             onScrollBeginDrag={onBannerScrollBegin}
             onMomentumScrollEnd={onBannerScrollEnd}
@@ -226,20 +231,21 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {categories && categories.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+      {/* Categories */}
+      {categories.length > 0 && (
+        <View style={sectionContainerStyle}>
+          <View style={[styles.sectionHeader, horizontalPadding]}>
             <Text style={[styles.sectionTitle, { color: C.text }]}>Categories</Text>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalList, horizontalPadding, { gap: CARD_GAP }]}>
             {categories.map((cat) => (
               <Pressable
                 key={cat.id}
-                style={({ pressed }) => [styles.categoryChip, { backgroundColor: C.surface, borderColor: C.border }, pressed && { opacity: 0.85 }]}
+                style={({ pressed }) => [styles.categoryChip, { backgroundColor: C.surface, borderColor: C.border }, pressed && styles.pressed]}
                 onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat.id.toString() } })}
               >
                 {cat.image_url ? (
-                  <View style={[styles.categoryChipImageWrap, { backgroundColor: C.productImageBg ?? "#ffffff" }]}>
+                  <View style={[styles.categoryChipImageWrap, { backgroundColor: C.productImageBg ?? "#f5f5f5" }]}>
                     <Image source={{ uri: cat.image_url }} style={styles.categoryChipImage} resizeMode="contain" />
                   </View>
                 ) : null}
@@ -250,24 +256,25 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Hot Products */}
       {hotProducts.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: C.text }]}>Hot Product List</Text>
+        <View style={sectionContainerStyle}>
+          <View style={[styles.sectionHeader, horizontalPadding]}>
+            <Text style={[styles.sectionTitle, { color: C.text }]}>Hot Products</Text>
             <Ionicons name="flame" size={18} color={Colors.accent} />
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalList, horizontalPadding, { gap: CARD_GAP, paddingRight: H_PADDING }]}>
             {hotProducts.map((product) => (
               <Pressable
                 key={product.id}
-                style={({ pressed }) => [styles.featuredCard, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.9 }]}
+                style={({ pressed }) => [styles.productCard, productCardStyle, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && styles.pressed]}
                 onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
-                <View style={[styles.featuredImageContainer, { backgroundColor: C.surface }]}>
-                  <Image source={{ uri: product.image_url }} style={styles.featuredImage} resizeMode="contain" />
+                <View style={[styles.productCardImage, { backgroundColor: C.productImageBg ?? "#f5f5f5" }]}>
+                  <Image source={{ uri: product.image_url }} style={styles.productCardImg} resizeMode="contain" />
                 </View>
-                <Text style={[styles.featuredName, { color: C.text }]} numberOfLines={1}>{product.name}</Text>
-                <View style={styles.featuredPrice}>
+                <Text style={[styles.productCardName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
+                <View style={styles.productCardPrice}>
                   <ProductPriceDisplay price={product.price} salePrice={product.sale_price} />
                 </View>
               </Pressable>
@@ -276,28 +283,56 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {products.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: C.text }]}>All Products</Text>
+      {/* Customize Clothes */}
+      {customizeProducts.length > 0 && (
+        <View style={sectionContainerStyle}>
+          <View style={[styles.sectionHeader, horizontalPadding]}>
+            <Text style={[styles.sectionTitle, { color: C.text }]}>Customize Clothes</Text>
+            <Ionicons name="brush-outline" size={18} color={C.textSecondary} />
           </View>
-          <View style={styles.productsGrid}>
-            {products.map((product) => (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalList, horizontalPadding, { gap: CARD_GAP, paddingRight: H_PADDING }]}>
+            {customizeProducts.map((product) => (
               <Pressable
                 key={product.id}
-                style={({ pressed }) => [styles.productCard, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && { opacity: 0.9 }]}
+                style={({ pressed }) => [styles.productCard, productCardStyle, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && styles.pressed]}
                 onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
-                <View style={[styles.productImageContainer, { backgroundColor: C.surface }]}>
-                  <Image source={{ uri: product.image_url }} style={styles.productImage} resizeMode="contain" />
+                <View style={[styles.productCardImage, { backgroundColor: C.productImageBg ?? "#f5f5f5" }]}>
+                  <Image source={{ uri: product.image_url }} style={styles.productCardImg} resizeMode="contain" />
                 </View>
-                <View style={styles.productInfo}>
-                  <Text style={[styles.productName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
+                <Text style={[styles.productCardName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
+                <View style={styles.productCardPrice}>
                   <ProductPriceDisplay price={product.price} salePrice={product.sale_price} />
                 </View>
               </Pressable>
             ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* All Products */}
+      {products.length > 0 && (
+        <View style={sectionContainerStyle}>
+          <View style={[styles.sectionHeader, horizontalPadding]}>
+            <Text style={[styles.sectionTitle, { color: C.text }]}>All Products</Text>
           </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalList, horizontalPadding, { gap: CARD_GAP, paddingRight: H_PADDING }]}>
+            {products.map((product) => (
+              <Pressable
+                key={product.id}
+                style={({ pressed }) => [styles.productCard, productCardStyle, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && styles.pressed]}
+                onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
+              >
+                <View style={[styles.productCardImage, { backgroundColor: C.productImageBg ?? "#f5f5f5" }]}>
+                  <Image source={{ uri: product.image_url }} style={styles.productCardImg} resizeMode="contain" />
+                </View>
+                <Text style={[styles.productCardName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
+                <View style={styles.productCardPrice}>
+                  <ProductPriceDisplay price={product.price} salePrice={product.sale_price} />
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
       )}
     </ScrollView>
@@ -311,10 +346,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
+    gap: 14,
   },
   loadingText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
@@ -322,21 +357,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
   },
   greeting: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: 2,
+    textTransform: "capitalize",
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   notifBtn: {
     width: 44,
@@ -348,22 +383,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  section: { marginBottom: 28 },
+  section: {},
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
     color: Colors.text,
   },
   heroBanner: {
     width: BANNER_WIDTH,
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: "hidden",
     height: BANNER_HEIGHT,
     ...cardShadow,
@@ -373,29 +407,29 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   bannerList: {
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   dotsRow: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 14,
-    gap: 8,
+    marginTop: 12,
+    gap: 6,
   },
   dot: {
-    borderRadius: 4,
+    borderRadius: 3,
   },
-  categoriesRow: {
-    paddingHorizontal: 20,
-    gap: 12,
+  horizontalList: {
+    flexDirection: "row",
+    paddingVertical: 16,
   },
+  pressed: { opacity: 0.88 },
   categoryChip: {
-    width: 88,
+    width: CATEGORY_SIZE + 16,
     backgroundColor: Colors.surface,
-    borderRadius: 16,
-    paddingBottom: 10,
-    paddingTop: 10,
-    paddingHorizontal: 6,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
@@ -403,8 +437,8 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   categoryChipImageWrap: {
-    width: 72,
-    height: 72,
+    width: CATEGORY_SIZE,
+    height: CATEGORY_SIZE,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
@@ -412,93 +446,44 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   categoryChipImage: {
-    width: 64,
-    height: 64,
+    width: CATEGORY_SIZE - 12,
+    height: CATEGORY_SIZE - 12,
   },
   categoryChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     textAlign: "center",
   },
-  featuredRow: {
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  featuredCard: {
-    width: 150,
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    ...cardShadow,
-  },
-  featuredImageContainer: {
-    backgroundColor: Colors.productImageBg,
-    padding: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  featuredImage: {
-    width: 120,
-    height: 120,
-    resizeMode: "contain",
-  },
-  featuredName: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-  },
-  featuredPrice: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-    color: Colors.accent,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    paddingTop: 4,
-  },
-  productsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 20,
-    gap: 14,
-  },
   productCard: {
-    width: CARD_WIDTH,
     backgroundColor: Colors.surface,
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: Colors.borderLight,
     ...cardShadow,
   },
-  productImageContainer: {
-    backgroundColor: Colors.productImageBg,
+  productCardImage: {
     padding: 12,
     alignItems: "center",
     justifyContent: "center",
-    height: CARD_WIDTH,
+    height: PRODUCT_CARD_WIDTH,
   },
-  productImage: {
+  productCardImg: {
     width: "100%",
     height: "100%",
-    resizeMode: "contain",
   },
-  productInfo: {
-    padding: 12,
-  },
-  productName: {
+  productCardName: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
-    marginBottom: 4,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    lineHeight: 18,
   },
-  productPrice: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-    color: Colors.accent,
+  productCardPrice: {
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    paddingTop: 4,
   },
 });

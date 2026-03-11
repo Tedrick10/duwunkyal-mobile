@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { LogBox } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -88,6 +89,11 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+
+  // Suppress known EXGL/Three.js warning so console stays clear
+  useEffect(() => {
+    LogBox.ignoreLogs(["EXGL: gl.pixelStorei", "gl.pixelStorei() doesn't support"]);
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded) {

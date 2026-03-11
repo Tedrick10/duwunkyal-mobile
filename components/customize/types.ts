@@ -59,6 +59,9 @@ export type CustomizationData = {
   bodyColor: string;
   sleeveColor: string;
   collarColor: string;
+  cuffColor?: string;
+  /** crew_neck = T-shirt: show "Neckline" instead of "Collar" in cart viewer */
+  neck_style?: "collar" | "crew_neck" | null;
   frontDesign: DesignElement[];
   backDesign: DesignElement[];
   totalPrice: number;
