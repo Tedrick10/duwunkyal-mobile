@@ -850,7 +850,14 @@ export default function CustomizeScreen() {
         )}
         <View style={styles.addToCartRow}>
           <Text style={styles.addToCartBarLabel}>Total</Text>
-          <Text style={styles.addToCartBarPrice}>{formatPriceMMK(totalPrice)}</Text>
+          <Text
+            style={styles.addToCartBarPrice}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+          >
+            {formatPriceMMK(totalPrice)}
+          </Text>
         </View>
         <TouchableOpacity
           style={[styles.addToCartBarBtn, addedToCart && styles.addToCartBarBtnAdded]}

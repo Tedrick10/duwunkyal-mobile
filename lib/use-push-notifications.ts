@@ -7,17 +7,6 @@ import { router } from "expo-router";
 import { apiMobileUrl, resolveNotificationImageUrl } from "./api-config";
 import { LocalDataService } from "./local-data-service";
 
-/** Configure how notifications are shown when app is in foreground (expo-notifications) */
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
-
 const ORDER_CHANNEL_ID = "order_updates";
 
 /** Create high-priority Android channel so notifications pop on screen (heads-up) */
@@ -39,18 +28,16 @@ async function ensureAndroidChannel() {
   }
 }
 
-/** Request notification permission */
+/** Request notification permission (required on iOS and Android 13+) */
 async function requestPermission() {
   if (!Device.isDevice || Platform.OS === "web") return false;
   try {
-    if (Platform.OS === "ios") {
-      const { status } = await Notifications.getPermissionsAsync();
-      if (status !== "granted") {
-        await Notifications.requestPermissionsAsync();
-      }
-    }
     const { status } = await Notifications.getPermissionsAsync();
-    return status === "granted";
+    if (status !== "granted") {
+      const { status: newStatus } = await Notifications.requestPermissionsAsync();
+      return newStatus === "granted";
+    }
+    return true;
   } catch {
     return false;
   }
@@ -64,6 +51,7 @@ async function registerTokenWithBackend(token: string, authToken: string | null)
       method: "POST",
       headers: {
         Accept: "application/json",
+        "Accept-Encoding": "gzip, deflate",
         "Content-Type": "application/json",
         Authorization: `Bearer ${authToken}`,
       },

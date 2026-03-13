@@ -232,7 +232,14 @@ export default function CartScreen() {
           <View style={[styles.bottomBar, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 80, backgroundColor: C.surface, borderTopColor: C.border }]}>
             <View style={styles.totalRow}>
               <Text style={[styles.totalLabel, { color: C.textSecondary }]}>Total</Text>
-              <Text style={[styles.totalValue, { color: Colors.accent }]}>{formatPriceMMK(total)}</Text>
+              <Text
+                style={[styles.totalValue, { color: Colors.accent }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+              >
+                {formatPriceMMK(total)}
+              </Text>
             </View>
             <Pressable
               style={({ pressed }) => [styles.checkoutBtn, pressed && { opacity: 0.9 }]}

@@ -464,7 +464,12 @@ export default function ProductDetailScreen() {
       >
         <View style={styles.bottomPrice}>
           <Text style={styles.bottomPriceLabel}>Total</Text>
-          <Text style={styles.bottomPriceValue}>
+          <Text
+            style={styles.bottomPriceValue}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+          >
             {formatPriceMMK(
               (effectivePrice + Number(selectedColorObj?.price_delta ?? 0)) * quantity
             )}

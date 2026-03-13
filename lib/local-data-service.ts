@@ -325,6 +325,7 @@ export const LocalDataService = {
     const url = apiMobileUrl("customerLogin");
     const headers: HeadersInit = {
       Accept: "application/json",
+      "Accept-Encoding": "gzip, deflate",
       "Content-Type": "application/json",
     };
     const body = JSON.stringify({

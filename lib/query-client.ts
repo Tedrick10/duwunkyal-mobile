@@ -15,6 +15,7 @@ async function apiMobileRequest(
   const url = apiMobileUrl(path.startsWith("api/") ? path.replace(/^api\/mobile\/?/, "") : path);
   const headers: HeadersInit = {
     Accept: "application/json",
+    "Accept-Encoding": "gzip, deflate",
     "Content-Type": "application/json",
     ...(t ? { Authorization: `Bearer ${t}` } : {}),
   };
@@ -807,15 +808,6 @@ export function getImageUrl(path: string | null | undefined): string {
     const base = getApiUrl();
     const baseOrigin = base.replace(/\/$/, "");
     if (path.startsWith("http://") || path.startsWith("https://")) {
-      const url = new URL(path);
-      if (
-        url.hostname === "127.0.0.1" ||
-        url.hostname === "localhost" ||
-        url.hostname === "0.0.0.0"
-      ) {
-        const baseUrl = new URL(baseOrigin);
-        return path.replace(url.origin, baseUrl.origin);
-      }
       return path;
     }
     return `${baseOrigin}${path.startsWith("/") ? path : `/${path}`}`;

@@ -97,7 +97,7 @@ export default function HomeScreen() {
     queryFn: async () => {
       const res = await fetch(apiMobileUrl("bannerList"), {
         method: "GET",
-        headers: { Accept: "application/json" },
+        headers: { Accept: "application/json", "Accept-Encoding": "gzip, deflate" },
       });
       if (!res.ok) throw new Error("Banner list failed");
       const json = await res.json();

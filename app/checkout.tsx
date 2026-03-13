@@ -164,7 +164,14 @@ export default function CheckoutScreen() {
         <View style={styles.divider} />
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>{formatPriceMMK(total)}</Text>
+          <Text
+            style={styles.totalValue}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+          >
+            {formatPriceMMK(total)}
+          </Text>
         </View>
       </View>
 

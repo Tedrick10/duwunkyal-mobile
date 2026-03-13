@@ -1,28 +1,8 @@
 /**
- * API Base URL – Set EXPO_PUBLIC_API_BASE_URL in .env (see .env.example).
- *
- * Postman works because it runs on your computer. Mobile runs on phone/simulator:
- * - iOS Simulator / Android Emulator: use http://127.0.0.1:8000 (same machine)
- * - Physical device (real phone): use your computer's LAN IP, e.g. http://192.168.1.2:8000
- *   and run backend with: php artisan serve --host=0.0.0.0
+ * API Base URL – Production server (deployed backend).
+ * Mobile app always uses this URL for API requests.
  */
-const envBase = process.env.EXPO_PUBLIC_API_BASE_URL;
-const envDomain = process.env.EXPO_PUBLIC_DOMAIN;
-
-function fromDomain(): string {
-  if (!envDomain || envDomain === "undefined" || envDomain === "null") {
-    // Default: LAN IP so physical device can reach backend. For simulator only, use http://127.0.0.1:8000
-    return "http://192.168.1.2:8000";
-  }
-  const protocol =
-    envDomain.startsWith("localhost") || envDomain.startsWith("127.0.0.1") ? "http" : "https";
-  return `${protocol}://${envDomain}`.replace(/\/$/, "");
-}
-
-export const API_BASE_URL =
-  envBase && envBase !== "undefined" && envBase !== "null"
-    ? envBase.replace(/\/$/, "")
-    : fromDomain();
+export const API_BASE_URL = "https://duwunkyalgarment.com";
 
 const envPrefix = process.env.EXPO_PUBLIC_API_PREFIX;
 const API_PREFIX =
@@ -50,8 +30,7 @@ export function apiMobileUrl(endpoint: string): string {
 
 /**
  * Resolve notification image URL so it's reachable from the mobile device.
- * - Replaces localhost/127.0.0.1 with the API base URL (e.g. LAN IP)
- * - Converts relative paths (storage/...) to full URLs using API base
+ * Converts relative paths (storage/...) to full URLs using API base.
  */
 export function resolveNotificationImageUrl(url: string | undefined | null): string {
   if (!url || typeof url !== "string") return "";
@@ -59,16 +38,6 @@ export function resolveNotificationImageUrl(url: string | undefined | null): str
   if (!trimmed) return "";
   try {
     const base = API_BASE_URL.replace(/\/$/, "");
-    if (
-      trimmed.startsWith("http://localhost") ||
-      trimmed.startsWith("https://localhost") ||
-      trimmed.startsWith("http://127.0.0.1") ||
-      trimmed.startsWith("https://127.0.0.1")
-    ) {
-      const pathMatch = trimmed.match(/^(https?:\/\/[^/]+)(\/.*)$/);
-      const path = pathMatch ? pathMatch[2] : trimmed;
-      return `${base}${path.startsWith("/") ? path : "/" + path}`;
-    }
     if (trimmed.startsWith("storage/") || trimmed.startsWith("/storage/")) {
       const path = trimmed.startsWith("/") ? trimmed : "/" + trimmed;
       return `${base}${path}`;
