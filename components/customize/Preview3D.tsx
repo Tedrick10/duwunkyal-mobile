@@ -25,6 +25,8 @@ type Props = {
   frontDesignTextureVersion?: number;
   backDesignTextureUri?: string | null;
   backDesignTextureVersion?: number;
+  /** Called when 3D model loading state changes (e.g. so parent can show "Please wait…"). */
+  onLoadingChange?: (loading: boolean) => void;
 };
 
 const ROTATION_SPEED = 0.008;
@@ -145,6 +147,7 @@ export function Preview3D({
   frontDesignTextureVersion = 0,
   backDesignTextureUri = null,
   backDesignTextureVersion = 0,
+  onLoadingChange,
 }: Props) {
   const animRef = useRef<number | null>(null);
   const rotationRef = useRef({ x: 0, y: 0 });
@@ -303,6 +306,10 @@ export function Preview3D({
   useEffect(() => {
     if (objUri) setModelReady(false);
   }, [objUri]);
+
+  useEffect(() => {
+    onLoadingChange?.(!!objUri && !modelReady);
+  }, [objUri, modelReady, onLoadingChange]);
 
   const panResponder = useMemo(
     () =>

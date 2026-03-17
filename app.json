@@ -2,14 +2,14 @@
   "expo": {
     "name": "DUWUN KYAL",
     "slug": "duwunkyal",
-    "version": "1.0.0+4",
+    "version": "1.0.1+2",
     "orientation": "portrait",
-    "icon": "./assets/images/favicon.png",
+    "icon": "./assets/images/logo-white-bg.png",
     "scheme": "duwunkyal",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-bg-white.png",
+      "image": "./assets/images/logo-white-bg.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -22,7 +22,7 @@
       "package": "com.nebwintech.duwunkyal",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
-        "foregroundImage": "./assets/images/favicon.png"
+        "foregroundImage": "./assets/images/logo-white-bg.png"
       },
       "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
@@ -36,7 +36,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/logo-white-bg.png"
     },
     "plugins": [
       [
@@ -56,7 +56,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/favicon.png",
+          "icon": "./assets/images/logo-white-bg.png",
           "color": "#ffffff",
           "sounds": [],
           "androidMode": "default",

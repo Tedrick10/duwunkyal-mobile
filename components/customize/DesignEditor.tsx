@@ -772,14 +772,14 @@ const DesignEditorInner = memo(function DesignEditorInner({
                     if (maskUrl) {
                       return (
                         <MaskedView
-                          key={`region-${deferredView}-${regionKey}`}
+                          key={`region-${view}-${regionKey}`}
                           style={[StyleSheet.absoluteFill, styles.tshirtBg, { width: w, height: h }]}
                           maskElement={
                             <Image
                               source={{ uri: maskUrl }}
                               style={[StyleSheet.absoluteFill, styles.tshirtBg, { width: w, height: h }]}
                               resizeMode="contain"
-                              onLoad={() => onMaskLoad(deferredView, regionKey)}
+                              onLoad={() => onMaskLoad(view, regionKey)}
                             />
                           }
                         >
@@ -805,7 +805,7 @@ const DesignEditorInner = memo(function DesignEditorInner({
                     if (!isRect && !isEllipse) return null;
                     return (
                       <MaskedView
-                        key={`region-${deferredView}-${regionKey}`}
+                        key={`region-${view}-${regionKey}`}
                         style={[StyleSheet.absoluteFill, styles.tshirtBg, { width: w, height: h }]}
                         maskElement={
                           <View style={[StyleSheet.absoluteFill, { width: w, height: h }]}>

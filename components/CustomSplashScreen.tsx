@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Image, ActivityIndicator } from "react-native";
 
-const logo = require("@/assets/images/logo-white-bg.png");
+const logo = require("../assets/images/logo-white-bg.png");
 
 export function CustomSplashScreen() {
   return (

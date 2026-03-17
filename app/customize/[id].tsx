@@ -7,6 +7,7 @@ import {
   Text,
   Alert,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -72,6 +73,7 @@ export default function CustomizeScreen() {
   const [redoStack, setRedoStack] = useState<DesignElement[][]>([]);
   const [addedToCart, setAddedToCart] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [is3DLoading, setIs3DLoading] = useState(false);
   const designEditorRef = useRef<DesignEditorRef>(null);
   const currentElementsRef = useRef<DesignElement[]>([]);
   const customizationColorsAppliedRef = useRef(false);
@@ -249,6 +251,18 @@ export default function CustomizeScreen() {
     }
     return Object.keys(out).length ? out : undefined;
   }, [customization?.back_view?.region_masks]);
+
+  // Prefetch mask images as soon as we have URLs so they appear at once when DesignEditor mounts
+  useEffect(() => {
+    const urls: string[] = [];
+    if (frontRegionMasksResolved) urls.push(...Object.values(frontRegionMasksResolved));
+    if (backRegionMasksResolved) urls.push(...Object.values(backRegionMasksResolved));
+    urls.forEach((uri) => {
+      if (uri && (uri.startsWith("http://") || uri.startsWith("https://"))) {
+        Image.prefetch(uri).catch(() => { });
+      }
+    });
+  }, [frontRegionMasksResolved, backRegionMasksResolved]);
 
   const customizeLoginRequired = !!id && customizationError && (customizationErr as any)?.loginRequired === true;
   const basePrice =
@@ -744,6 +758,14 @@ export default function CustomizeScreen() {
         </View>
       </View>
 
+      {is3DLoading ? (
+        <View style={styles.banner3DLoading}>
+          <Text style={styles.banner3DLoadingText}>
+            Please wait, 3D view is loading. Buttons may be unresponsive briefly.
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.mainContent}>
         <DesignEditor
           ref={designEditorRef}
@@ -811,6 +833,7 @@ export default function CustomizeScreen() {
                 frontDesignTextureVersion={designTextureByView.front.v}
                 backDesignTextureUri={designTextureByView.back.uri}
                 backDesignTextureVersion={designTextureByView.back.v}
+                onLoadingChange={setIs3DLoading}
               />
             </View>
             <Text style={styles.preview3DLabel}>3D</Text>
@@ -961,6 +984,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingBottom: 4,
     gap: 4,
+  },
+  banner3DLoading: {
+    backgroundColor: "rgba(233, 69, 96, 0.9)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  banner3DLoadingText: {
+    color: "#fff",
+    fontSize: 12,
+    textAlign: "center",
   },
   backButton: {
     flexDirection: "row",
