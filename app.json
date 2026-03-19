@@ -2,7 +2,7 @@
   "expo": {
     "name": "DUWUN KYAL",
     "slug": "duwunkyal",
-    "version": "1.0.1+2",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/logo-white-bg.png",
     "scheme": "duwunkyal",
@@ -14,9 +14,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "com.nebwintech.duwunkyal",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "deploymentTarget": "16.6",
+      "infoPlist": {
+        "UIRequiresFullScreen": true
+      }
     },
     "android": {
       "package": "com.nebwintech.duwunkyal",
@@ -30,15 +34,21 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO"
+        "android.permission.READ_MEDIA_IMAGES"
       ]
     },
     "web": {
       "favicon": "./assets/images/logo-white-bg.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.6"
+          }
+        }
+      ],
       [
         "expo-router",
         {

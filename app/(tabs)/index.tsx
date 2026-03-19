@@ -7,8 +7,8 @@ import {
   Pressable,
   Image,
   ActivityIndicator,
-  Dimensions,
   Platform,
+  useWindowDimensions,
   RefreshControl,
   FlatList,
   NativeSyntheticEvent,
@@ -29,15 +29,12 @@ import { NotificationIconWithBadge } from "@/components/NotificationIconWithBadg
 
 export type BannerItem = { id: number; image_url: string };
 
-const { width } = Dimensions.get("window");
 const H_PADDING = 20;
-const BANNER_WIDTH = width - H_PADDING * 2;
-const BANNER_HEIGHT = 180;
 const BANNER_GAP = 16;
 const AUTO_SCROLL_INTERVAL = 4500;
 const SECTION_SPACING = 32;
 const CARD_GAP = 14;
-const PRODUCT_CARD_WIDTH = 148;
+const BASE_PRODUCT_CARD_WIDTH = 148;
 const CATEGORY_SIZE = 80;
 
 function BannerDot({ index, activeIndex, accentColor }: { index: number; activeIndex: number; accentColor: string }) {
@@ -56,6 +53,13 @@ function BannerDot({ index, activeIndex, accentColor }: { index: number; activeI
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  /** Full native iPad width (not compatibility window); scales banner & cards. */
+  const isTabletLayout = windowWidth >= 768;
+  const bannerWidth = Math.max(0, windowWidth - H_PADDING * 2);
+  const bannerHeight = isTabletLayout ? Math.min(320, Math.round(bannerWidth * 0.42)) : 180;
+  const productCardWidth = isTabletLayout ? 172 : BASE_PRODUCT_CARD_WIDTH;
+
   const { user } = useAuth();
   const { colors: C } = useTheme();
   const webTopInset = Platform.OS === "web" ? 67 : 0;
@@ -110,15 +114,16 @@ export default function HomeScreen() {
 
   const startAutoScroll = useCallback(() => {
     if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+    const slideStride = bannerWidth + BANNER_GAP;
     autoScrollTimer.current = setInterval(() => {
       if (userInteracting.current || !bannerRef.current || bannerItems.length <= 1) return;
       setActiveSlide((prev) => {
         const next = (prev + 1) % bannerItems.length;
-        bannerRef.current?.scrollToOffset({ offset: next * (BANNER_WIDTH + BANNER_GAP), animated: true });
+        bannerRef.current?.scrollToOffset({ offset: next * slideStride, animated: true });
         return next;
       });
     }, AUTO_SCROLL_INTERVAL);
-  }, [bannerItems.length]);
+  }, [bannerItems.length, bannerWidth]);
 
   useEffect(() => {
     if (bannerItems.length > 1) startAutoScroll();
@@ -134,11 +139,11 @@ export default function HomeScreen() {
   const onBannerScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       userInteracting.current = false;
-      const idx = Math.round(e.nativeEvent.contentOffset.x / (BANNER_WIDTH + BANNER_GAP));
+      const idx = Math.round(e.nativeEvent.contentOffset.x / (bannerWidth + BANNER_GAP));
       setActiveSlide(idx);
       startAutoScroll();
     },
-    [startAutoScroll]
+    [startAutoScroll, bannerWidth]
   );
 
   function onRefresh() {
@@ -158,14 +163,14 @@ export default function HomeScreen() {
   }
 
   const renderBannerItem = ({ item }: { item: BannerItem }) => (
-    <View style={styles.heroBanner}>
+    <View style={[styles.heroBanner, { width: bannerWidth, height: bannerHeight }]}>
       <Image source={{ uri: item.image_url }} style={styles.heroImage} resizeMode="cover" />
     </View>
   );
 
   const sectionContainerStyle = [styles.section, { marginBottom: SECTION_SPACING }];
   const horizontalPadding = { paddingHorizontal: H_PADDING };
-  const productCardStyle = { width: PRODUCT_CARD_WIDTH };
+  const productCardStyle = { width: productCardWidth };
 
   return (
     <ScrollView
@@ -204,10 +209,11 @@ export default function HomeScreen() {
             ref={bannerRef}
             data={bannerItems}
             renderItem={renderBannerItem}
+            extraData={{ bannerWidth, bannerHeight }}
             keyExtractor={(item) => String(item.id)}
             horizontal
             showsHorizontalScrollIndicator={false}
-            snapToInterval={BANNER_WIDTH + BANNER_GAP}
+            snapToInterval={bannerWidth + BANNER_GAP}
             snapToAlignment="start"
             decelerationRate="fast"
             contentContainerStyle={[styles.bannerList, horizontalPadding]}
@@ -216,8 +222,8 @@ export default function HomeScreen() {
             onMomentumScrollEnd={onBannerScrollEnd}
             onScrollEndDrag={onBannerScrollEnd}
             getItemLayout={(_, index) => ({
-              length: BANNER_WIDTH + BANNER_GAP,
-              offset: (BANNER_WIDTH + BANNER_GAP) * index,
+              length: bannerWidth + BANNER_GAP,
+              offset: (bannerWidth + BANNER_GAP) * index,
               index,
             })}
           />
@@ -270,7 +276,7 @@ export default function HomeScreen() {
                 style={({ pressed }) => [styles.productCard, productCardStyle, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && styles.pressed]}
                 onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
-                <View style={[styles.productCardImage, { backgroundColor: C.productImageBg ?? "#f5f5f5" }]}>
+                <View style={[styles.productCardImage, { backgroundColor: C.productImageBg ?? "#f5f5f5", height: productCardWidth }]}>
                   <Image source={{ uri: product.image_url }} style={styles.productCardImg} resizeMode="contain" />
                 </View>
                 <Text style={[styles.productCardName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
@@ -297,7 +303,7 @@ export default function HomeScreen() {
                 style={({ pressed }) => [styles.productCard, productCardStyle, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && styles.pressed]}
                 onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
-                <View style={[styles.productCardImage, { backgroundColor: C.productImageBg ?? "#f5f5f5" }]}>
+                <View style={[styles.productCardImage, { backgroundColor: C.productImageBg ?? "#f5f5f5", height: productCardWidth }]}>
                   <Image source={{ uri: product.image_url }} style={styles.productCardImg} resizeMode="contain" />
                 </View>
                 <Text style={[styles.productCardName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
@@ -323,7 +329,7 @@ export default function HomeScreen() {
                 style={({ pressed }) => [styles.productCard, productCardStyle, { backgroundColor: C.surface, borderColor: C.borderLight }, pressed && styles.pressed]}
                 onPress={() => router.push({ pathname: "/product/[id]", params: { id: product.id.toString() } })}
               >
-                <View style={[styles.productCardImage, { backgroundColor: C.productImageBg ?? "#f5f5f5" }]}>
+                <View style={[styles.productCardImage, { backgroundColor: C.productImageBg ?? "#f5f5f5", height: productCardWidth }]}>
                   <Image source={{ uri: product.image_url }} style={styles.productCardImg} resizeMode="contain" />
                 </View>
                 <Text style={[styles.productCardName, { color: C.text }]} numberOfLines={2}>{product.name}</Text>
@@ -396,10 +402,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   heroBanner: {
-    width: BANNER_WIDTH,
     borderRadius: 16,
     overflow: "hidden",
-    height: BANNER_HEIGHT,
     ...cardShadow,
   },
   heroImage: {
@@ -467,7 +471,6 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: "center",
     justifyContent: "center",
-    height: PRODUCT_CARD_WIDTH,
   },
   productCardImg: {
     width: "100%",
