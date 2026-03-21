@@ -34,7 +34,9 @@ async function requestPermission() {
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== "granted") {
-      const { status: newStatus } = await Notifications.requestPermissionsAsync();
+      const { status: newStatus } = await Notifications.requestPermissionsAsync({
+        ios: { allowAlert: true, allowBadge: true, allowSound: true },
+      });
       return newStatus === "granted";
     }
     return true;
@@ -231,6 +233,10 @@ export function useNotificationResponseHandler() {
             channelId: ORDER_CHANNEL_ID,
             priority: Notifications.AndroidNotificationPriority.MAX,
             vibrate: [0, 250, 250, 250],
+          }),
+          ...(Platform.OS === "ios" && {
+            interruptionLevel: "timeSensitive" as const,
+            sound: "default" as const,
           }),
         },
         trigger: null,

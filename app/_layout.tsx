@@ -1,10 +1,14 @@
-import "@/lib/firebase-messaging-background";
-import "@/lib/notification-handler";
+import { LogBox, Platform } from "react-native";
+if (Platform.OS === "android") {
+  require("@/lib/firebase-messaging-background");
+}
+if (Platform.OS === "ios") {
+  require("@/lib/notification-handler").initializeNotificationHandler();
+}
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { LogBox } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -21,7 +25,11 @@ import {
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
 
-SplashScreen.preventAutoHideAsync();
+try {
+  SplashScreen.preventAutoHideAsync();
+} catch {
+  // Ignore if splash fails on device (e.g. native module not ready)
+}
 
 function RootLayoutNav() {
   return (
@@ -117,9 +125,13 @@ export default function RootLayout() {
           <NotificationSetup />
           <ThemeProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
-              <KeyboardProvider>
+              {Platform.OS === "ios" ? (
                 <RootLayoutNav />
-              </KeyboardProvider>
+              ) : (
+                <KeyboardProvider>
+                  <RootLayoutNav />
+                </KeyboardProvider>
+              )}
             </GestureHandlerRootView>
           </ThemeProvider>
         </AuthProvider>

@@ -2,7 +2,7 @@
   "expo": {
     "name": "DUWUN KYAL",
     "slug": "duwunkyal",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/logo-white-bg.png",
     "scheme": "duwunkyal",
@@ -20,7 +20,8 @@
       "deploymentTarget": "16.6",
       "infoPlist": {
         "UIRequiresFullScreen": true
-      }
+      },
+      "appleTeamId": "FH4F75KHBD"
     },
     "android": {
       "package": "com.nebwintech.duwunkyal",
@@ -34,7 +35,9 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-        "android.permission.READ_MEDIA_IMAGES"
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
       ]
     },
     "web": {
@@ -45,7 +48,8 @@
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "16.6"
+            "deploymentTarget": "16.6",
+            "buildReactNativeFromSource": true
           }
         }
       ],
@@ -79,7 +83,7 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "router": {

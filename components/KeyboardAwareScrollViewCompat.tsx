@@ -1,5 +1,10 @@
 // template
-import { Platform, ScrollView, ScrollViewProps } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ScrollViewProps,
+} from "react-native";
 import {
   KeyboardAwareScrollView,
   KeyboardAwareScrollViewProps,
@@ -17,6 +22,24 @@ export function KeyboardAwareScrollViewCompat({
       <ScrollView keyboardShouldPersistTaps={keyboardShouldPersistTaps} {...props}>
         {children}
       </ScrollView>
+    );
+  }
+  // iOS: Skip KeyboardProvider/KeyboardAwareScrollView to avoid TurboModule crash on iOS 26
+  if (Platform.OS === "ios") {
+    return (
+      <KeyboardAvoidingView
+        behavior="padding"
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+          keyboardDismissMode="on-drag"
+          {...props}
+        >
+          {children}
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
   return (

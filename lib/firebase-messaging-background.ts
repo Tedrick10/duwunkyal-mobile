@@ -27,6 +27,10 @@ if (Platform.OS !== "web") {
               priority: Notifications.AndroidNotificationPriority.MAX,
               vibrate: [0, 250, 250, 250],
             }),
+            ...(Platform.OS === "ios" && {
+              interruptionLevel: "timeSensitive" as const,
+              sound: "default" as const,
+            }),
           },
           trigger: null,
         });

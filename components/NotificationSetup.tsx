@@ -7,9 +7,9 @@ export function NotificationSetup() {
 
   useEffect(() => {
     if (Constants.appOwnership === "expo") return; // Expo Go – don't load expo-notifications
-    import("./NotificationSetupNative").then((m) =>
-      setNativeSetup(() => m.NotificationSetupNative)
-    );
+    import("./NotificationSetupNative")
+      .then((m) => setNativeSetup(() => m.NotificationSetupNative))
+      .catch(() => { }); // Don't crash app if native push setup fails on device
   }, []);
 
   if (!NativeSetup) return null;
